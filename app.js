@@ -17,6 +17,10 @@ import { initExports, updateReportFilter, setExpDate, exportExcel, exportPDF,
          loadAuditLog }                                                         from './exports.js';
 import { initUsers, addUser, renderUsersList, softDeleteUser, reactivateUser,
          hardDeleteUser, openEditPermissions, saveEditPermissions }             from './users.js';
+import { initShifts, openShiftClosure, updateShiftView, calcShiftVariance,
+         saveShiftClosure, renderShifts, deleteShiftRecord }                   from './shifts.js';
+import { initReconcile, addRecRow, removeRecRow, calcRecRow,
+         runReconcileUI }                                                       from './reconcile.js';
 
 // ══════════════════════════════════════════════
 // CONSTANTS — الثوابت
@@ -109,7 +113,7 @@ function invalidateCache() { _balsCache = null; _balsKey = ''; }
 const ctx = {
   getState: () => AppState,
   helpers: {
-    fEN, fD, fENn, bCls, setEl, toast, allBalances,
+    g, fEN, fD, fENn, bCls, setEl, toast, allBalances,
     EL, TL,
     get writeAuditLog() { return writeAuditLog; },
     get METER_PRICE()   { return AppState.meterPrice; },
@@ -611,173 +615,9 @@ function openSidebar()  { g('sidebar')?.classList.add('mobile-open'); g('sb-over
 function closeSidebar() { g('sidebar')?.classList.remove('mobile-open'); g('sb-overlay')?.classList.remove('show'); }
 
 // ══════════════════════════════════════════════
-// SHIFTS — إقفال الوردية
+// SHIFTS & RECONCILIATION — مُدارة من وحدات منفصلة
+// shifts.js و reconcile.js
 // ══════════════════════════════════════════════
-function openShiftClosure() {
-  const mo = g('shift-mo'); if (!mo) return;
-  // إعادة تعيين
-  const actual = g('shift-actual-amt'); if (actual) actual.value = '';
-  const notes  = g('shift-notes'); if (notes) notes.value = '';
-  const vrRow  = g('shift-variance-row'); if (vrRow) vrRow.style.display = 'none';
-
-  if (AppState.currentRole === 'admin') {
-    const wrap = g('shift-user-wrap'); if (wrap) wrap.style.display = 'block';
-    const sel  = g('shift-user-select'); if (!sel) { mo.classList.add('open'); return; }
-    const users = {}; AppState.entries.forEach(e => { if (e.createdBy) users[e.createdBy] = e.createdByName||e.createdBy; });
-    sel.innerHTML = Object.entries(users).map(([em,nm]) => `<option value="${em}">${nm} (${em})</option>`).join('');
-    sel.innerHTML += `<option value="__all__">🌐 الكل</option>`;
-    updateShiftView();
-  } else {
-    const wrap = g('shift-user-wrap'); if (wrap) wrap.style.display = 'none';
-    updateShiftView();
-  }
-  mo.classList.add('open');
-}
-
-function updateShiftView() {
-  const selectedEmail = AppState.currentRole === 'admin'
-    ? (g('shift-user-select')?.value || '__all__')
-    : AppState.currentUser?.email;
-
-  const relevant = AppState.entries.filter(e => {
-    if (selectedEmail === '__all__') return true;
-    return e.createdBy === selectedEmail;
-  });
-
-  let bal = 0;
-  const asc = [...relevant].sort((a,b) => (a.createdAt||'').localeCompare(b.createdAt||''));
-  asc.forEach(e => { bal += (e.deb||0) - (e.crd||0); });
-  setEl('shift-system-bal', `${fEN(bal)} ر.س`);
-  g('shift-system-bal').style.color = bal >= 0 ? 'var(--green)' : 'var(--red)';
-  calcShiftVariance();
-}
-
-function calcShiftVariance() {
-  const actual    = parseFloat(g('shift-actual-amt')?.value);
-  const sysBalStr = g('shift-system-bal')?.textContent || '0';
-  const sysBal    = parseFloat(sysBalStr.replace(/,/g,'').replace('ر.س','').trim()) || 0;
-  if (isNaN(actual)) { const vr=g('shift-variance-row'); if(vr)vr.style.display='none'; return; }
-  const diff = +(actual - sysBal).toFixed(2);
-  const vrRow = g('shift-variance-row'); if (vrRow) vrRow.style.display = 'block';
-  setEl('shift-variance-val', `${diff >= 0 ? '+' : ''}${fEN(diff)} ر.س`);
-  const lbl = g('shift-variance-lbl');
-  if (lbl) {
-    lbl.textContent = diff === 0 ? '✅ متطابق' : diff > 0 ? '📈 زيادة' : '📉 نقص';
-    lbl.style.color = diff === 0 ? 'var(--green)' : diff > 0 ? 'var(--b600)' : 'var(--red)';
-  }
-  const valEl = g('shift-variance-val');
-  if (valEl) valEl.style.color = diff === 0 ? 'var(--green)' : diff > 0 ? 'var(--b600)' : 'var(--red)';
-}
-
-async function saveShiftClosure() {
-  const actual = parseFloat(g('shift-actual-amt')?.value);
-  if (isNaN(actual) || actual < 0) { toast('⚠ أدخل المبلغ الفعلي','err'); return; }
-
-  const sysBalStr = g('shift-system-bal')?.textContent || '0';
-  const sysBal    = parseFloat(sysBalStr.replace(/,/g,'').replace('ر.س','').trim()) || 0;
-  const notes     = (g('shift-notes')?.value || '').trim();
-  const diff      = +(actual - sysBal).toFixed(2);
-  const selectedEmail = AppState.currentRole === 'admin' ? (g('shift-user-select')?.value||'__all__') : AppState.currentUser?.email;
-
-  const btn = g('shift-save-btn');
-  if (btn) { btn.textContent='جاري الإقفال...'; btn.disabled=true; }
-  try {
-    await addDoc(collection(db, COLL.SHIFTS), {
-      closedBy:       AppState.currentUser.email,
-      closedByName:   g('tb-username')?.textContent || '',
-      forUser:        selectedEmail,
-      systemBalance:  sysBal,
-      actualAmount:   actual,
-      variance:       diff,
-      notes,
-      closedAt:       new Date().toISOString()
-    });
-    closeMo('shift-mo');
-    await renderShifts();
-    toast(`✅ تم إقفال الوردية — الفارق: ${fEN(diff)} ر.س`,'ok');
-    await writeAuditLog('SHIFT_CLOSURE', { actual, sysBal, diff });
-  } catch(e) { toast('⚠ خطأ في الإقفال','err'); }
-  if (btn) { btn.textContent='🔒 تأكيد الإقفال'; btn.disabled=false; }
-}
-
-async function renderShifts() {
-  const el = g('shifts-list'); if (!el) return;
-  el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text3);font-size:.8rem">جاري التحميل...</div>';
-  try {
-    const snap = await getDocs(collection(db, COLL.SHIFTS));
-    const shifts = []; snap.forEach(d => shifts.push({id:d.id,...d.data()}));
-    shifts.sort((a,b) => (b.closedAt||'').localeCompare(a.closedAt||''));
-    if (!shifts.length) { el.innerHTML='<div style="padding:20px;text-align:center;color:var(--text3)">لا توجد إقفالات بعد</div>'; return; }
-    el.innerHTML = shifts.map(s => {
-      const dt = s.closedAt ? new Date(s.closedAt).toLocaleString('ar-SA',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
-      const diffBadge = s.variance===0 ? 'background:#dcfce7;color:#15803d' : s.variance>0 ? 'background:#dbeafe;color:#1d4ed8' : 'background:#fee2e2;color:#b91c1c';
-      return `<div class="shift-row">
-        <div class="shift-hd">
-          <span class="shift-user">${s.closedByName||s.closedBy}</span>
-          <span class="shift-badge" style="${diffBadge};border:1px solid currentColor">الفارق: ${s.variance>=0?'+':''}${fEN(s.variance)} ر.س</span>
-        </div>
-        <div class="shift-time">📅 ${dt} ${s.forUser&&s.forUser!='__all__'?`| 👤 ${s.forUser}`:''}</div>
-        <div class="shift-stats">
-          <div class="sst"><div class="sst-l">الرصيد النظامي</div><div class="sst-v">${fEN(s.systemBalance)} ر.س</div></div>
-          <div class="sst"><div class="sst-l">المبلغ الفعلي</div><div class="sst-v">${fEN(s.actualAmount)} ر.س</div></div>
-          <div class="sst"><div class="sst-l">الفارق</div><div class="sst-v" style="${diffBadge};padding:3px 6px;border-radius:6px">${s.variance>=0?'+':''}${fEN(s.variance)}</div></div>
-        </div>
-        ${s.notes?`<div class="shift-note">📝 ${s.notes}</div>`:''}
-        ${AppState.currentRole==='admin'?`<div style="margin-top:8px"><button class="sg-btn danger" style="font-size:.68rem;padding:3px 10px" onclick="deleteShiftRecord('${s.id}')">🗑 حذف</button></div>`:''}
-      </div>`;
-    }).join('');
-  } catch(e) { el.innerHTML='<div style="padding:16px;color:var(--red);text-align:center">خطأ في التحميل</div>'; }
-}
-
-async function deleteShiftRecord(id) {
-  if (!confirm('حذف هذا الإقفال؟')) return;
-  try {
-    await deleteDoc(doc(db, COLL.SHIFTS, id));
-    await renderShifts();
-    toast('✅ تم الحذف','ok');
-  } catch(e) { toast('⚠ خطأ في الحذف','err'); }
-}
-
-// ══════════════════════════════════════════════
-// RECONCILIATION — المطابقة
-// ══════════════════════════════════════════════
-window._recRows = [];
-function addRecRow() {
-  window._recRows.push({ slNo: window._recRows.length+1, date:'', truck:'', tripSheet:'', rawM:0, deducted:0, certM:0 });
-  renderRecTable();
-}
-function removeRecRow(i) {
-  window._recRows.splice(i,1);
-  renderRecTable();
-}
-function renderRecTable() {
-  const tb = g('rec-input-tbody'); if (!tb) return;
-  if (!window._recRows.length) { tb.innerHTML='<tr><td colspan="8" style="padding:16px;text-align:center;color:var(--text3)">اضغط "إضافة صف" لبدء إدخال بيانات الكشف</td></tr>'; return; }
-  tb.innerHTML = window._recRows.map((r,i) => `<tr>
-    <td>${r.slNo||i+1}</td>
-    <td><input type="date" value="${r.date}" oninput="_recRows[${i}].date=this.value" style="min-width:120px;padding:5px 8px;font-size:.8rem"></td>
-    <td><input type="text" value="${r.truck}" placeholder="رقم الشاحنة" oninput="_recRows[${i}].truck=this.value" style="min-width:100px;padding:5px 8px;font-size:.8rem"></td>
-    <td><input type="text" value="${r.tripSheet}" placeholder="رقم القسيمة" oninput="_recRows[${i}].tripSheet=this.value" style="min-width:100px;padding:5px 8px;font-size:.8rem"></td>
-    <td><input type="number" value="${r.rawM||''}" placeholder="0" min="0" step="0.5" oninput="_recRows[${i}].rawM=parseFloat(this.value)||0;_calcRecRow(${i})" style="min-width:90px;padding:5px 8px;font-size:.8rem"></td>
-    <td><input type="number" value="${r.deducted||''}" placeholder="0" min="0" step="0.5" oninput="_recRows[${i}].deducted=parseFloat(this.value)||0;_calcRecRow(${i})" style="min-width:90px;padding:5px 8px;font-size:.8rem"></td>
-    <td style="font-weight:800;color:var(--b600)">${r.certM||0}م</td>
-    <td><button onclick="removeRecRow(${i})" style="background:var(--red2);border:1px solid var(--red);border-radius:5px;padding:3px 10px;cursor:pointer;font-size:.8rem;color:var(--red)">✕</button></td>
-  </tr>`).join('');
-}
-function _calcRecRow(i) {
-  const r = window._recRows[i]; if (!r) return;
-  r.certM = +(Math.max(0, r.rawM - r.deducted)).toFixed(2);
-  const cells = g('rec-input-tbody')?.rows[i]?.cells;
-  if (cells && cells[6]) cells[6].textContent = r.certM+'م';
-}
-
-function _runReconcile() {
-  if (!window._recRows.length) { toast('⚠ أضف صفوفاً في جدول الكشف','err'); return; }
-  const meterEntries = AppState.entries.filter(e => e.type === 'meter');
-  const from = g('rec-from')?.value||''; const to = g('rec-to')?.value||'';
-  const filtered = from||to ? meterEntries.filter(e => (!from||e.date>=from)&&(!to||e.date<=to)) : meterEntries;
-  runReconcile(window._recRows, filtered, AppState.invoicePrice);
-}
 
 // ══════════════════════════════════════════════
 // PERMISSION TOGGLES — تبديل الصلاحيات
@@ -863,17 +703,19 @@ window.renderLedger         = renderLedger;
 window.saveSettings         = saveSettings;
 window.deleteAllData        = deleteAllData;
 window.applyContractorName  = applyContractorName;
-// Shifts
+// Shifts (من shifts.js)
 window.openShiftClosure     = openShiftClosure;
 window.updateShiftView      = updateShiftView;
 window.calcShiftVariance    = calcShiftVariance;
 window.saveShiftClosure     = saveShiftClosure;
 window.deleteShiftRecord    = deleteShiftRecord;
-// Reconcile
+// Reconcile (من reconcile.js)
 window.addRecRow            = addRecRow;
 window.removeRecRow         = removeRecRow;
-window.runReconcile         = _runReconcile;
-window._calcRecRow          = _calcRecRow;
+window.calcRecRow           = calcRecRow;
+window.runReconcile         = runReconcileUI;
+// ربط runReconcile من reports.js للاستخدام في reconcile.js
+window._runReconcileReport  = (rows, entries, invoicePrice) => runReconcile(rows, entries, invoicePrice);
 // Users
 window.addUser              = addUser;
 window.renderUsersList      = renderUsersList;
@@ -913,6 +755,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initReports(ctx);
   initExports(ctx);
   initUsers(ctx, DEFAULT_PERMS, ALL_PAGES);
+  initShifts(ctx);
+  initReconcile(ctx);
   initAuth(onLoginSuccess, onLogout, DEFAULT_PERMS);
 
   // تهيئة الـ state الأولية للنماذج

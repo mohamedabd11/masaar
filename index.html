@@ -883,5 +883,57 @@
   </div>
 </div>
 
+
+<!-- ══════════════════════════════════════════
+     شريط تحديث التطبيق (PWA)
+     ══════════════════════════════════════════ -->
+<div id="sw-update-bar" style="
+  display:none; position:fixed; bottom:0; right:0; left:0; z-index:9999;
+  background:#1d4ed8; color:#fff; padding:10px 16px;
+  display:none; align-items:center; justify-content:space-between;
+  font-family:Tajawal,sans-serif; font-size:.85rem; gap:10px;">
+  <span>🔄 يتوفر إصدار جديد من التطبيق</span>
+  <button onclick="window._swUpdate()" style="
+    background:#fff; color:#1d4ed8; border:none; border-radius:6px;
+    padding:5px 14px; cursor:pointer; font-family:Tajawal,sans-serif;
+    font-size:.8rem; font-weight:700;">تحديث الآن</button>
+</div>
+
+<script>
+// ── تسجيل Service Worker ──
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+
+      // كشف التحديثات الجديدة
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        if (!newWorker) return;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            // يوجد إصدار جديد — إظهار شريط التحديث
+            const bar = document.getElementById('sw-update-bar');
+            if (bar) bar.style.display = 'flex';
+            window._swUpdate = () => {
+              newWorker.postMessage({ type: 'SKIP_WAITING' });
+              window.location.reload();
+            };
+          }
+        });
+      });
+
+    }).catch(err => {
+      console.warn('[SW] Registration failed:', err);
+    });
+
+    // إعادة التحميل عند تفعيل Service Worker جديد
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!refreshing) { refreshing = true; window.location.reload(); }
+    });
+  });
+}
+</script>
+
 </body>
 </html>
