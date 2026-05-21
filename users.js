@@ -39,9 +39,18 @@ export async function addUser() {
   if (pass.length < 6)  { toast('⚠ كلمة المرور 6 أحرف على الأقل','err');   return; }
   if (!_isValidEmail(email)) { toast('⚠ البريد الإلكتروني غير صحيح','err'); return; }
 
-  const customPages = [];
-  document.querySelectorAll('.perm-check:checked').forEach(cb => customPages.push(cb.value));
-  if (!customPages.length) { toast('⚠ اختر صلاحية واحدة على الأقل','err'); return; }
+  // تحديد نوع المستخدم: مدير أو موظف
+  const roleType = window._newUserRoleType || 'employee';
+  let userRole, customPages;
+  if (roleType === 'manager') {
+    userRole    = 'manager';
+    customPages = _DEFAULT_PERMS.manager || [];
+  } else {
+    userRole    = 'custom';
+    customPages = [];
+    document.querySelectorAll('.perm-check:checked').forEach(cb => customPages.push(cb.value));
+    if (!customPages.length) { toast('⚠ اختر صلاحية واحدة على الأقل','err'); return; }
+  }
 
   const btn = g('add-user-btn');
   if (btn) { btn.textContent='جاري الإضافة...'; btn.disabled=true; }
@@ -58,7 +67,7 @@ export async function addUser() {
       // إعادة تفعيل / تحديث الصلاحيات
       await updateDoc(doc(db, COLL.USERS, existingDoc.id), {
         deleted: false, active: true, displayName: name,
-        role: 'custom', customPages,
+        role: userRole, customPages,
         updatedAt: new Date().toISOString(), updatedBy: currentUser.email,
       });
       toast(`✅ تم تفعيل "${name}" بصلاحيات جديدة`, 'ok');
@@ -83,7 +92,7 @@ export async function addUser() {
       }
 
       await setDoc(doc(db, COLL.USERS, newUid), {
-        email, displayName: name, role: 'custom', customPages,
+        email, displayName: name, role: userRole, customPages,
         active: true, deleted: false,
         createdAt: new Date().toISOString(), createdBy: currentUser.email,
       });
@@ -136,20 +145,27 @@ export async function renderUsersList() {
       const statusBadge = u.deleted
         ? `<span style="font-size:.62rem;background:#fee2e2;color:var(--red);border:1px solid #fca5a5;border-radius:4px;padding:1px 7px;display:inline-block;margin-right:4px">🔴 معطّل</span>`
         : `<span style="font-size:.62rem;background:#dcfce7;color:var(--green);border:1px solid #86efac;border-radius:4px;padding:1px 7px;display:inline-block;margin-right:4px">🟢 نشط</span>`;
+      const roleBadge = u.role === 'admin'
+        ? `<span style="font-size:.62rem;background:#fef9c3;color:#92400e;border:1px solid #d97706;border-radius:4px;padding:1px 7px;display:inline-block;margin-right:4px">⭐ مدير النظام</span>`
+        : u.role === 'manager'
+        ? `<span style="font-size:.62rem;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:4px;padding:1px 7px;display:inline-block;margin-right:4px">👔 مدير</span>`
+        : `<span style="font-size:.62rem;background:var(--surface);color:var(--text3);border:1px solid var(--line);border-radius:4px;padding:1px 7px;display:inline-block;margin-right:4px">👤 موظف</span>`;
       const actionBtn = isMe ? '' : u.deleted
         ? `<div style="display:flex;flex-direction:column;gap:5px">
              <button class="sg-btn" style="font-size:.7rem;padding:5px 10px;background:var(--green);white-space:nowrap" onclick="reactivateUser('${u.id}','${_esc(u.displayName||u.email)}')">✅ إعادة تفعيل</button>
              <button class="sg-btn" style="font-size:.7rem;padding:5px 10px;background:var(--red);white-space:nowrap" onclick="hardDeleteUser('${u.id}','${_esc(u.email)}')">🗑 حذف نهائي</button>
            </div>`
         : `<div style="display:flex;flex-direction:column;gap:5px">
-             <button class="sg-btn" style="font-size:.7rem;padding:5px 10px;background:var(--b600);white-space:nowrap" onclick="openEditPermissions('${u.id}','${_esc(u.displayName||u.email)}','${encodeURIComponent(JSON.stringify(u.customPages||[]))}')">✏️ تعديل</button>
+             <button class="sg-btn" style="font-size:.7rem;padding:5px 10px;background:var(--b600);white-space:nowrap" onclick="openEditPermissions('${u.id}','${_esc(u.displayName||u.email)}','${encodeURIComponent(JSON.stringify(u.customPages||[]))}','${u.role||'custom'}')">✏️ تعديل</button>
              <button class="sg-btn" style="font-size:.7rem;padding:5px 10px;background:var(--red);white-space:nowrap" onclick="softDeleteUser('${u.id}','${_esc(u.email)}')">تعطيل</button>
            </div>`;
       return `<div class="user-row" style="flex-wrap:wrap;gap:8px;align-items:flex-start;${u.deleted?'opacity:.6':''}">
-        <div class="user-avatar" style="${u.deleted?'background:var(--text3)':''}">${(u.displayName||u.email||'?').charAt(0).toUpperCase()}</div>
+        <div class="user-avatar" style="${u.deleted?'background:var(--text3)':u.role==='manager'?'background:#1d4ed8':''}">
+          ${(u.displayName||u.email||'?').charAt(0).toUpperCase()}
+        </div>
         <div class="user-info" style="flex:1;min-width:140px">
           <div class="user-name" style="display:flex;align-items:center;flex-wrap:wrap;gap:4px">
-            ${_esc(u.displayName||u.email)} ${isMe?'<span style="font-size:.65rem;color:var(--text3)">(أنت)</span>':''} ${statusBadge}
+            ${_esc(u.displayName||u.email)} ${isMe?'<span style="font-size:.65rem;color:var(--text3)">(أنت)</span>':''} ${roleBadge} ${statusBadge}
           </div>
           <div style="font-size:.7rem;color:var(--text3);margin-bottom:4px">${_esc(u.email)}</div>
           <div>${pagesHtml}</div>
@@ -224,12 +240,22 @@ export async function hardDeleteUser(uid, email) {
 // ══════════════════════════════
 // تعديل صلاحيات مستخدم
 // ══════════════════════════════
-export function openEditPermissions(uid, name, currentPagesJson) {
+export function openEditPermissions(uid, name, currentPagesJson, currentUserRole) {
   const mo = g('edit-perms-mo');
   if (!mo) return;
   g('ep-title').textContent = `✏️ صلاحيات ${name}`;
   mo._uid  = uid;
   mo._name = name;
+
+  const isManager = currentUserRole === 'manager';
+  window._editUserRoleType = isManager ? 'manager' : 'employee';
+  const permWrap = g('ep-perm-wrap');
+  if (permWrap) permWrap.style.display = isManager ? 'none' : '';
+  const eBtn = g('ep-role-employee');
+  const mBtn = g('ep-role-manager');
+  if (eBtn) eBtn.className = 'ctype' + (!isManager ? ' act-r' : '');
+  if (mBtn) mBtn.className = 'ctype' + (isManager  ? ' act-r' : '');
+
   let currentPerms = [];
   try { currentPerms = JSON.parse(decodeURIComponent(currentPagesJson)); } catch{}
   document.querySelectorAll('.ep-perm-card').forEach(card => {
@@ -249,17 +275,25 @@ export async function saveEditPermissions() {
   const name = mo?._name;
   if (!uid) { toast('⚠ خطأ في البيانات','err'); return; }
 
-  const customPages = [];
-  document.querySelectorAll('.ep-perm-card.selected .perm-check').forEach(cb => customPages.push(cb.value));
-  if (!customPages.length) { toast('⚠ اختر صلاحية واحدة على الأقل','err'); return; }
+  const roleType = window._editUserRoleType || 'employee';
+  let userRole, customPages;
+  if (roleType === 'manager') {
+    userRole    = 'manager';
+    customPages = _DEFAULT_PERMS.manager || [];
+  } else {
+    userRole    = 'custom';
+    customPages = [];
+    document.querySelectorAll('.ep-perm-card.selected .perm-check').forEach(cb => customPages.push(cb.value));
+    if (!customPages.length) { toast('⚠ اختر صلاحية واحدة على الأقل','err'); return; }
+  }
 
   const btn = g('ep-save-btn');
   if (btn) { btn.textContent='جاري الحفظ...'; btn.disabled=true; }
   try {
     await updateDoc(doc(db, COLL.USERS, uid), {
-      customPages, updatedAt: new Date().toISOString(), updatedBy: get().currentUser?.email
+      role: userRole, customPages, updatedAt: new Date().toISOString(), updatedBy: get().currentUser?.email
     });
-    await writeAuditLog('EDIT_PERMISSIONS', { uid, name });
+    await writeAuditLog('EDIT_PERMISSIONS', { uid, name, role: userRole });
     g('edit-perms-mo').classList.remove('open');
     await renderUsersList();
     toast(`✅ تم تحديث صلاحيات "${name}"`, 'ok');

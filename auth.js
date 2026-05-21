@@ -87,6 +87,9 @@ async function _handleAuthUser(user) {
 /** تحديد الصفحات المتاحة للمستخدم */
 function _getPagesForUser(userData) {
   if (userData.role === 'admin') return _DEFAULT_PERMS.admin;
+  if (userData.role === 'manager') {
+    return (userData.customPages?.length) ? userData.customPages : (_DEFAULT_PERMS.manager || []);
+  }
   if (userData.customPages && userData.customPages.length > 0) return userData.customPages;
   return _DEFAULT_PERMS[userData.role] || _DEFAULT_PERMS.editor;
 }
