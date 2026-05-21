@@ -16,7 +16,8 @@ export {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
-  createUserWithEmailAndPassword
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 export {

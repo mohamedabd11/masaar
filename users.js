@@ -4,7 +4,7 @@
 
 import {
   auth, db, COLL,
-  signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   collection, getDocs, doc, deleteDoc, updateDoc, setDoc
 } from './firebase.js';
 
@@ -30,14 +30,11 @@ export async function addUser() {
   const { currentUser } = get();
   const { toast, writeAuditLog } = h();
 
-  const email  = (g('new-email')?.value       || '').trim().toLowerCase();
-  const pass   = (g('new-password')?.value    || '').trim();
-  const name   = (g('new-name')?.value        || '').trim() || email.split('@')[0];
-  const adminP = (g('current-pass-for-add')?.value || '').trim();
+  const email = (g('new-email')?.value || '').trim().toLowerCase();
+  const name  = (g('new-name')?.value  || '').trim() || email.split('@')[0];
 
-  if (!email || !pass)  { toast('⚠ أدخل البريد وكلمة المرور','err');        return; }
-  if (pass.length < 6)  { toast('⚠ كلمة المرور 6 أحرف على الأقل','err');   return; }
-  if (!_isValidEmail(email)) { toast('⚠ البريد الإلكتروني غير صحيح','err'); return; }
+  if (!email)               { toast('⚠ أدخل البريد الإلكتروني','err');    return; }
+  if (!_isValidEmail(email)){ toast('⚠ البريد الإلكتروني غير صحيح','err'); return; }
 
   // تحديد نوع المستخدم: مدير أو موظف
   const roleType = window._newUserRoleType || 'employee';
@@ -56,7 +53,7 @@ export async function addUser() {
   if (btn) { btn.textContent='جاري الإضافة...'; btn.disabled=true; }
 
   try {
-    // فحص وجود المستخدم مسبقاً في قاعدة البيانات
+    // فحص وجود المستخدم في Firestore
     const usersSnap = await getDocs(collection(db, COLL.USERS));
     let existingDoc = null;
     usersSnap.forEach(d => {
@@ -64,56 +61,74 @@ export async function addUser() {
     });
 
     if (existingDoc) {
-      // إعادة تفعيل / تحديث الصلاحيات
+      // إعادة تفعيل مستخدم موجود وتحديث صلاحياته
       await updateDoc(doc(db, COLL.USERS, existingDoc.id), {
         deleted: false, active: true, displayName: name,
         role: userRole, customPages,
         updatedAt: new Date().toISOString(), updatedBy: currentUser.email,
       });
-      toast(`✅ تم تفعيل "${name}" بصلاحيات جديدة`, 'ok');
     } else {
-      let newUid = null;
-      try {
-        const cred = await createUserWithEmailAndPassword(auth, email, pass);
-        newUid = cred.user.uid;
-      } catch (createErr) {
-        if (createErr.code === 'auth/email-already-in-use') {
-          if (btn) btn.textContent = 'جاري استعادة...';
-          try {
-            const existCred = await signInWithEmailAndPassword(auth, email, pass);
-            newUid = existCred.user.uid;
-          } catch {
-            if (adminP) await signInWithEmailAndPassword(auth, currentUser.email, adminP).catch(()=>{});
-            toast('⚠ هذا البريد مسجّل بكلمة مرور مختلفة','err');
-            if (btn) { btn.textContent='➕ إضافة المستخدم'; btn.disabled=false; }
-            return;
-          }
-        } else { throw createErr; }
+      // إنشاء حساب Firebase Auth عبر REST API
+      // (لا يؤثر على جلسة المدير الحالية — لا تسجيل خروج)
+      const apiKey = auth.app.options.apiKey;
+      const res  = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`,
+        {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ email, password: _randomPassword(), returnSecureToken: true })
+        }
+      );
+      const data = await res.json();
+
+      if (data.error) {
+        const msg = data.error.message || '';
+        if (msg === 'EMAIL_EXISTS') {
+          // الحساب موجود في Firebase Auth لكن ليس في Firestore
+          // نرسل رابط الدعوة فقط
+          await sendPasswordResetEmail(auth, email).catch(() => {});
+          toast('⚠ البريد مُسجَّل مسبقاً — تم إرسال رابط الدعوة له', '');
+          if (btn) { btn.textContent='➕ إضافة المستخدم'; btn.disabled=false; }
+          return;
+        }
+        throw new Error(msg);
       }
 
-      await setDoc(doc(db, COLL.USERS, newUid), {
+      // حفظ بيانات المستخدم في Firestore
+      await setDoc(doc(db, COLL.USERS, data.localId), {
         email, displayName: name, role: userRole, customPages,
         active: true, deleted: false,
         createdAt: new Date().toISOString(), createdBy: currentUser.email,
       });
-
-      // العودة لحساب المدير
-      if (adminP) await signInWithEmailAndPassword(auth, currentUser.email, adminP).catch(()=>{});
-      toast(`✅ تم إضافة "${name}" بنجاح`, 'ok');
-      await writeAuditLog('ADD_USER', { email, name });
+      await writeAuditLog('ADD_USER', { email, name, role: userRole });
     }
 
-    // مسح الحقول
-    ['new-email','new-password','new-name','current-pass-for-add'].forEach(id => { const el=g(id); if(el)el.value=''; });
+    // إرسال رابط الدعوة بالبريد الإلكتروني
+    await sendPasswordResetEmail(auth, email).catch(err => {
+      console.warn('[AddUser] sendPasswordResetEmail:', err.message);
+    });
+
+    toast(`✅ تم إضافة "${name}" وإرسال رابط الدعوة إلى ${email}`, 'ok');
+
+    // مسح حقول النموذج
+    ['new-email','new-name'].forEach(id => { const el=g(id); if(el) el.value=''; });
     document.querySelectorAll('.perm-card').forEach(c => c.classList.remove('selected'));
     document.querySelectorAll('.perm-check').forEach(cb => cb.checked=false);
     await renderUsersList();
 
   } catch(e) {
-    if (e.code === 'auth/email-already-in-use') toast('⚠ البريد الإلكتروني مستخدم مسبقاً','err');
-    else toast('⚠ خطأ في الإضافة — تحقق من البيانات','err');
+    console.error('[AddUser]', e);
+    toast('⚠ خطأ في الإضافة — ' + (e.message || 'تحقق من البيانات'), 'err');
   }
   if (btn) { btn.textContent='➕ إضافة المستخدم'; btn.disabled=false; }
+}
+
+/** كلمة مرور عشوائية قوية (داخلية فقط — لا تُعرض لأحد) */
+function _randomPassword() {
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$';
+  let p = '';
+  for (let i = 0; i < 18; i++) p += chars[Math.floor(Math.random() * chars.length)];
+  return p;
 }
 
 // ══════════════════════════════
