@@ -692,6 +692,14 @@
             <button class="sg-btn neutral" id="import-json-btn" onclick="importJSON()">استيراد</button>
           </div>
           <div class="sg-row">
+            <span class="sg-ico">📋</span>
+            <div class="sg-info">
+              <div class="sg-label">تصدير نموذج Excel</div>
+              <div class="sg-desc">حمّل ملف النموذج لمعرفة التنسيق الصحيح للاستيراد</div>
+            </div>
+            <button class="sg-btn" onclick="exportExcelTemplate()" style="background:var(--b600)">نموذج</button>
+          </div>
+          <div class="sg-row">
             <span class="sg-ico">📊</span>
             <div class="sg-info">
               <div class="sg-label">استيراد من Excel</div>
@@ -778,20 +786,31 @@
 <!-- تقرير مستخدم -->
 <div class="mo" id="user-report-mo">
   <div class="mo-box" style="max-width:700px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;border-bottom:2px solid var(--b400);padding-bottom:8px">
-      <h3 id="ur-title" style="margin-bottom:0;border:none;padding:0">📊 تقرير المستخدم</h3>
+
+    <!-- ── العنوان وأزرار التصدير ── -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;border-bottom:2px solid var(--b400);padding-bottom:10px;flex-wrap:wrap;gap:8px">
+      <h3 id="ur-title" style="margin-bottom:0;border:none;padding:0;font-size:1rem">📊 تقرير المستخدم</h3>
       <div style="display:flex;gap:6px">
-        <button class="sg-btn" onclick="exportUserReportPDF()" style="background:var(--red);padding:4px 10px;font-size:.7rem">📊 PDF</button>
-        <button class="sg-btn" onclick="exportUserReportExcel()" style="background:var(--green);padding:4px 10px;font-size:.7rem">🍏 Excel</button>
-        <button class="sg-btn neutral" onclick="closeMo('user-report-mo')" style="padding:4px 10px;font-size:.7rem">إغلاق ×</button>
+        <button class="sg-btn" onclick="exportUserReportPDF()"   style="background:var(--red);  padding:6px 14px;font-size:.78rem;font-weight:700">📄 PDF</button>
+        <button class="sg-btn" onclick="exportUserReportExcel()" style="background:var(--green);padding:6px 14px;font-size:.78rem;font-weight:700">📊 Excel</button>
       </div>
     </div>
+
+    <!-- ── فلتر التاريخ ── -->
     <div style="background:var(--surface);padding:8px 12px;border-radius:8px;border:1px solid var(--line);margin-bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <span style="font-size:.75rem;font-weight:700;color:var(--text3)">تصفية الفترة:</span>
       <input type="date" id="ur-from" onchange="renderUserReportTable()" style="padding:4px 8px;font-size:.75rem;width:140px;background:#fff;cursor:pointer">
       <input type="date" id="ur-to"   onchange="renderUserReportTable()" style="padding:4px 8px;font-size:.75rem;width:140px;background:#fff;cursor:pointer">
     </div>
-    <div id="ur-body" style="max-height:55vh;overflow-y:auto;margin-bottom:14px"></div>
+
+    <!-- ── جسم التقرير ── -->
+    <div id="ur-body" style="max-height:52vh;overflow-y:auto;margin-bottom:14px"></div>
+
+    <!-- ── زر الإغلاق في الأسفل ── -->
+    <div style="border-top:1px solid var(--line);padding-top:12px;text-align:center">
+      <button class="sg-btn neutral" onclick="closeMo('user-report-mo')" style="padding:8px 32px;font-size:.85rem;font-weight:700">إغلاق ✕</button>
+    </div>
+
   </div>
 </div>
 

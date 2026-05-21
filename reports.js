@@ -417,16 +417,21 @@ async function renderActivityLog() {
     const map = {};
     allEntries.forEach(e => {
       const k = e.createdByName || e.createdBy || 'غير معروف';
-      if (!map[k]) map[k] = { name: k, email: e.createdBy||'', count: 0, deb: 0, crd: 0, meters: 0 };
-      map[k].count++; map[k].deb += (e.deb||0); map[k].crd += (e.crd||0); map[k].meters += (e.met||0);
+      if (!map[k]) map[k] = { name: k, email: e.createdBy||'', count: 0, deb: 0, crd: 0, meters: 0, meterCount: 0 };
+      map[k].count++;
+      map[k].deb    += (e.deb||0);
+      map[k].crd    += (e.crd||0);
+      map[k].meters += (e.met||0);
+      if (e.type === 'meter') map[k].meterCount++;
     });
     const rows = Object.values(map).sort((a,b) => b.count - a.count);
     if (!rows.length) { el.innerHTML = '<p style="color:var(--text3);text-align:center;padding:14px">لا توجد بيانات</p>'; return; }
-    el.innerHTML = `<div class="scroll-x"><table style="min-width:400px">
-      <thead><tr><th>المستخدم</th><th>الحركات</th><th>الوارد</th><th>الصادر</th><th>الأمتار</th><th></th></tr></thead>
+    el.innerHTML = `<div class="scroll-x"><table style="min-width:460px">
+      <thead><tr><th>المستخدم</th><th>الحركات</th><th>📏 السندات</th><th>الوارد</th><th>الصادر</th><th>الأمتار</th><th></th></tr></thead>
       <tbody>${rows.map(r => `<tr style="cursor:pointer" onclick="openUserReport('${_esc(r.email||r.name)}','${_esc(r.name)}')">
         <td style="font-weight:700;color:var(--b600)">${_esc(r.name)}</td>
         <td>${fENn(r.count)}</td>
+        <td><span style="display:inline-flex;align-items:center;gap:3px;background:var(--b100);color:var(--b600);border:1px solid var(--b200);border-radius:20px;padding:2px 9px;font-size:.72rem;font-weight:800">${fENn(r.meterCount)}</span></td>
         <td class="td-deb">${r.deb ? fEN(r.deb) : ''}</td>
         <td class="td-crd">${r.crd ? fEN(r.crd) : ''}</td>
         <td style="color:var(--b600);font-weight:700">${r.meters ? r.meters+'م' : ''}</td>
