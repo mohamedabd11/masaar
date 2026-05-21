@@ -30,14 +30,14 @@ export async function addUser() {
   const { currentUser } = get();
   const { toast, writeAuditLog } = h();
 
-  const email  = (g('new-email')?.value       || '').trim().toLowerCase();
-  const pass   = (g('new-password')?.value    || '').trim();
-  const name   = (g('new-name')?.value        || '').trim() || email.split('@')[0];
+  const email  = (g('new-email')?.value           || '').trim().toLowerCase();
+  const pass   = (g('new-password')?.value         || '').trim();
+  const name   = (g('new-name')?.value             || '').trim() || email.split('@')[0];
   const adminP = (g('current-pass-for-add')?.value || '').trim();
 
-  if (!email || !pass)  { toast('⚠ أدخل البريد وكلمة المرور','err');        return; }
-  if (pass.length < 6)  { toast('⚠ كلمة المرور 6 أحرف على الأقل','err');   return; }
-  if (!_isValidEmail(email)) { toast('⚠ البريد الإلكتروني غير صحيح','err'); return; }
+  if (!email || !pass) { toast('⚠ أدخل البريد وكلمة المرور','err'); return; }
+  if (pass.length < 6) { toast('⚠ كلمة المرور 6 أحرف على الأقل','err'); return; }
+  if (!adminP)         { toast('⚠ أدخل كلمة مرورك الحالية للتأكيد','err'); return; }
 
   // تحديد نوع المستخدم: مدير أو موظف
   const roleType = window._newUserRoleType || 'employee';
@@ -56,7 +56,7 @@ export async function addUser() {
   if (btn) { btn.textContent='جاري الإضافة...'; btn.disabled=true; }
 
   try {
-    // فحص وجود المستخدم مسبقاً في قاعدة البيانات
+    // فحص وجود المستخدم في Firestore
     const usersSnap = await getDocs(collection(db, COLL.USERS));
     let existingDoc = null;
     usersSnap.forEach(d => {
@@ -64,54 +64,42 @@ export async function addUser() {
     });
 
     if (existingDoc) {
-      // إعادة تفعيل / تحديث الصلاحيات
+      // إعادة تفعيل مستخدم موجود وتحديث صلاحياته
       await updateDoc(doc(db, COLL.USERS, existingDoc.id), {
         deleted: false, active: true, displayName: name,
         role: userRole, customPages,
         updatedAt: new Date().toISOString(), updatedBy: currentUser.email,
       });
-      toast(`✅ تم تفعيل "${name}" بصلاحيات جديدة`, 'ok');
     } else {
-      let newUid = null;
-      try {
-        const cred = await createUserWithEmailAndPassword(auth, email, pass);
-        newUid = cred.user.uid;
-      } catch (createErr) {
-        if (createErr.code === 'auth/email-already-in-use') {
-          if (btn) btn.textContent = 'جاري استعادة...';
-          try {
-            const existCred = await signInWithEmailAndPassword(auth, email, pass);
-            newUid = existCred.user.uid;
-          } catch {
-            if (adminP) await signInWithEmailAndPassword(auth, currentUser.email, adminP).catch(()=>{});
-            toast('⚠ هذا البريد مسجّل بكلمة مرور مختلفة','err');
-            if (btn) { btn.textContent='➕ إضافة المستخدم'; btn.disabled=false; }
-            return;
-          }
-        } else { throw createErr; }
-      }
-
-      await setDoc(doc(db, COLL.USERS, newUid), {
+      // إنشاء حساب Firebase Auth جديد (يُسجّل الدخول كالمستخدم الجديد مؤقتاً)
+      const cred = await createUserWithEmailAndPassword(auth, email, pass);
+      await setDoc(doc(db, COLL.USERS, cred.user.uid), {
         email, displayName: name, role: userRole, customPages,
         active: true, deleted: false,
         createdAt: new Date().toISOString(), createdBy: currentUser.email,
       });
+      await writeAuditLog('ADD_USER', { email, name, role: userRole });
 
-      // العودة لحساب المدير
-      if (adminP) await signInWithEmailAndPassword(auth, currentUser.email, adminP).catch(()=>{});
-      toast(`✅ تم إضافة "${name}" بنجاح`, 'ok');
-      await writeAuditLog('ADD_USER', { email, name });
+      // إعادة تسجيل دخول المدير
+      await signInWithEmailAndPassword(auth, currentUser.email, adminP);
     }
 
-    // مسح الحقول
-    ['new-email','new-password','new-name','current-pass-for-add'].forEach(id => { const el=g(id); if(el)el.value=''; });
+    toast(`✅ تمت إضافة "${name}" بنجاح`, 'ok');
+
+    // مسح حقول النموذج
+    ['new-email','new-password','new-name','current-pass-for-add'].forEach(id => { const el=g(id); if(el) el.value=''; });
     document.querySelectorAll('.perm-card').forEach(c => c.classList.remove('selected'));
     document.querySelectorAll('.perm-check').forEach(cb => cb.checked=false);
     await renderUsersList();
 
   } catch(e) {
-    if (e.code === 'auth/email-already-in-use') toast('⚠ البريد الإلكتروني مستخدم مسبقاً','err');
-    else toast('⚠ خطأ في الإضافة — تحقق من البيانات','err');
+    console.error('[AddUser]', e);
+    const msg = e.code === 'auth/email-already-in-use'
+      ? 'البريد مُسجَّل مسبقاً — تحقق من قائمة المستخدمين'
+      : (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential')
+      ? 'كلمة مرور المدير غير صحيحة'
+      : 'خطأ في الإضافة — ' + (e.message || 'تحقق من البيانات');
+    toast('⚠ ' + msg, 'err');
   }
   if (btn) { btn.textContent='➕ إضافة المستخدم'; btn.disabled=false; }
 }
