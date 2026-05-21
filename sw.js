@@ -2,7 +2,7 @@
 // sw.js — Service Worker لدعم PWA والعمل بدون إنترنت
 // ══════════════════════════════════════════════════════════
 
-const CACHE_NAME    = 'masaar-v2';
+const CACHE_NAME    = 'masaar-v3';
 const OFFLINE_URL   = './index.html';
 
 // الملفات المحلية التي تُخزَّن في أول تشغيل
