@@ -603,11 +603,9 @@
             <div class="fg">
               <div><label>الاسم</label><input type="text" id="new-name" placeholder="اسم المستخدم"></div>
               <div><label>البريد الإلكتروني</label><input type="email" id="new-email" placeholder="user@email.com" inputmode="email" style="direction:ltr;text-align:right"></div>
-              <div class="full">
-                <div style="background:var(--b100);border:1px solid var(--b200);border-radius:var(--r2);padding:10px 14px;font-size:.78rem;color:var(--b700);display:flex;align-items:center;gap:8px">
-                  <span style="font-size:1.1rem">📧</span>
-                  <span>سيصل الموظف بريداً إلكترونياً يحتوي رابطاً لتعيين كلمة مروره والدخول للنظام</span>
-                </div>
+              <div class="full user-pass-grid">
+                <div><label>كلمة المرور</label><input type="password" id="new-password" placeholder="6 أحرف على الأقل"></div>
+                <div><label style="color:var(--amber)">كلمة مرور المدير الحالي لتأكيد الصلاحية</label><input type="password" id="current-pass-for-add" placeholder="أدخل كلمة مرورك الحالية"></div>
               </div>
             </div>
             <div style="margin-top:14px">
