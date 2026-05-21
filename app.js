@@ -21,6 +21,7 @@ import { initShifts, openShiftClosure, updateShiftView, calcShiftVariance,
          saveShiftClosure, renderShifts, deleteShiftRecord }                   from './shifts.js';
 import { initReconcile, addRecRow, removeRecRow, calcRecRow,
          runReconcileUI }                                                       from './reconcile.js';
+import { exportExcelTemplate }                                                  from './exports.js';
 
 // ══════════════════════════════════════════════
 // CONSTANTS — الثوابت
@@ -610,7 +611,13 @@ function closeMo(id) {
 // ══════════════════════════════════════════════
 // SIDEBAR — الشريط الجانبي
 // ══════════════════════════════════════════════
-function toggleSidebar() { g('sidebar')?.classList.toggle('collapsed'); }
+function toggleSidebar() {
+  const sb = g('sidebar');
+  if (!sb) return;
+  // على الموبايل: الزر الداخلي يغلق الشريط
+  if (window.innerWidth < 768) { closeSidebar(); return; }
+  sb.classList.toggle('collapsed');
+}
 function openSidebar()  { g('sidebar')?.classList.add('mobile-open'); g('sb-overlay')?.classList.add('show'); }
 function closeSidebar() { g('sidebar')?.classList.remove('mobile-open'); g('sb-overlay')?.classList.remove('show'); }
 
@@ -732,6 +739,7 @@ window.exportShortExcel     = exportShortExcel;
 window.exportUserReportPDF  = exportUserReportPDF;
 window.exportUserReportExcel= exportUserReportExcel;
 window.exportJSON           = () => exportJSON(AppState.currentUser, writeAuditLog);
+window.exportExcelTemplate  = exportExcelTemplate;
 window.importJSON           = () => importJSON(AppState.currentUser, writeAuditLog);
 window.importExcel          = () => importExcel(AppState.currentUser, writeAuditLog);
 window.loadAuditLog         = loadAuditLog;
@@ -774,20 +782,40 @@ document.addEventListener('DOMContentLoaded', () => {
     if (el) el.addEventListener('click', function(e) { if(e.target===this) closeMo(id); });
   });
 
-  // ── زر الرجوع في Android ──
-  // نستخدم popstate مع pushState مرة واحدة عند بدء التطبيق
+  // ── زر الرجوع في Android — إغلاق المودال أولاً ثم التنقل ──
+  const _ALL_MODALS = ['user-report-mo','shift-mo','edit-mo','confirm-mo','edit-perms-mo','dup-ref-mo'];
+  history.pushState(null, '', ''); // state أولي دائماً موجود
+
   window.addEventListener('popstate', () => {
-    if (!AppState.currentUser) return; // لم يسجل دخول بعد
-    const target = _navHistory.pop() || 'pg-dash';
-    if (AppState.currentPageId === target) return;
-    // تنقل للصفحة السابقة بدون إضافة لـ history
+    if (!AppState.currentUser) return;
+
+    // أولاً: إغلاق أي مودال مفتوح
+    const openMoId = _ALL_MODALS.find(id => g(id)?.classList.contains('open'));
+    if (openMoId) {
+      closeMo(openMoId);
+      history.pushState(null, '', ''); // أعد الـ state لضمان عمل الزر مرة أخرى
+      return;
+    }
+
+    // ثانياً: إغلاق الشريط الجانبي على الموبايل
+    if (g('sidebar')?.classList.contains('mobile-open')) {
+      closeSidebar();
+      history.pushState(null, '', '');
+      return;
+    }
+
+    // ثالثاً: التنقل للصفحة السابقة
+    const target = _navHistory.pop();
+    if (!target || target === AppState.currentPageId) {
+      history.pushState(null, '', ''); // لا يوجد سابقة — ابقَ في مكانك
+      return;
+    }
     AppState.currentPageId = target;
     document.querySelectorAll('.sb-item').forEach(b =>
       b.classList.toggle('active', b.getAttribute('data-page') === target));
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     const pg = g(target); if (pg) pg.classList.add('active');
     setEl('pg-title', PAGE_TITLES[target] || '');
-    // أعد وضع الـ dummy state حتى يعمل زر الرجوع مرة أخرى
     history.pushState(null, '', '');
   });
 

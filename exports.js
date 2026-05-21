@@ -783,6 +783,113 @@ export function importExcel(currentUser, writeAuditLog) {
 }
 
 // ══════════════════════════════
+// تصدير نموذج Excel للاستيراد
+// ══════════════════════════════
+export function exportExcelTemplate() {
+  const cen = { horizontal:'center', vertical:'center', readingOrder:2 };
+  const rit = { horizontal:'right',  vertical:'center', readingOrder:2 };
+  const S   = _xlsxStyles(cen, rit);
+
+  const ws = XLSX.utils.aoa_to_sheet([]); ws['!rightToLeft'] = true;
+
+  // ── صف العنوان ──
+  XLSX.utils.sheet_add_aoa(ws, [['نموذج استيراد مسار — لا تغيّر أسماء الأعمدة','','','','','','','','','','']], { origin:'A1' });
+
+  // ── صف الأعمدة ──
+  const headers = ['التاريخ','السند','النوع','البيان','اللوحة','أمتار','خصم','وارد','صادر','الوردية','ملاحظات'];
+  XLSX.utils.sheet_add_aoa(ws, [headers], { origin:'A2' });
+
+  // ── صف الشرح ──
+  const desc = [
+    'YYYY-MM-DD مثال: 2026-05-21',
+    'رقم السند (اختياري)',
+    'سند أمتار | استلام | تسليم | مصروف',
+    'وصف الحركة',
+    'رقم اللوحة للسيارة',
+    'الكمية الأصلية للأمتار',
+    'الخصم من الأمتار',
+    'المبلغ الوارد (استلام عهدة)',
+    'المبلغ الصادر (مصروف أو تسليم)',
+    'صباحي أو مسائي',
+    'ملاحظات إضافية (اختياري)'
+  ];
+  XLSX.utils.sheet_add_aoa(ws, [desc], { origin:'A3' });
+
+  // ── بيانات مثال ──
+  const examples = [
+    ['2026-05-21','1001','سند أمتار','سند أمتار — لوحة أ ب ج 123','أ ب ج 123','150','5','0','2030','صباحي',''],
+    ['2026-05-21','1002','سند أمتار','سند أمتار — لوحة س ص ع 456','س ص ع 456','200','0','0','2800','مسائي',''],
+    ['2026-05-21','1003','استلام','استلام عهدة نقدية','','0','0','5000','0','',''],
+    ['2026-05-21','1004','تسليم','تسليم عهدة للسائق','','0','0','0','1500','',''],
+    ['2026-05-21','1005','مصروف','وقود للسيارة','','0','0','0','200','','وقود'],
+    ['2026-05-21','1006','مصروف','وجبات الطاقم','','0','0','0','150','',''],
+  ];
+  XLSX.utils.sheet_add_aoa(ws, examples, { origin:'A4' });
+
+  // ── تنسيق الخلايا ──
+  // عنوان
+  'ABCDEFGHIJK'.split('').forEach(c => { if(ws[c+'1']) ws[c+'1'].s = S.title; });
+
+  // رؤوس الأعمدة
+  'ABCDEFGHIJK'.split('').forEach(c => { if(ws[c+'2']) ws[c+'2'].s = S.hdr; });
+
+  // صف الشرح — لون مختلف
+  const descStyle = { font:{sz:9,italic:true,color:{rgb:'FF64748B'}}, fill:{fgColor:{rgb:'FFFFF8DC'}},
+    alignment:{horizontal:'center',vertical:'center',readingOrder:2,wrapText:true},
+    border:{top:{style:'thin',color:{rgb:'FFDDE8FF'}},bottom:{style:'thin',color:{rgb:'FFDDE8FF'}},
+            left:{style:'thin',color:{rgb:'FFDDE8FF'}},right:{style:'thin',color:{rgb:'FFDDE8FF'}}} };
+  'ABCDEFGHIJK'.split('').forEach(c => { if(ws[c+'3']) ws[c+'3'].s = descStyle; });
+
+  // بيانات المثال
+  examples.forEach((_,i) => {
+    const r = i + 4; const alt = i % 2 !== 0;
+    'ABCDEFGHIJK'.split('').forEach(c => {
+      if (ws[c+r]) ws[c+r].s = alt ? S.rowA : S.rowW;
+    });
+    // تلوين أعمدة الأرقام
+    ['F','G','H','I'].forEach(c => {
+      if (ws[c+r]) ws[c+r].s = { ...(alt ? S.rowA : S.rowW),
+        font: { sz:10, color: { rgb: c==='H' ? 'FF15803D' : c==='I' ? 'FFB91C1C' : 'FF1D4ED8' } }
+      };
+    });
+  });
+
+  ws['!merges'] = [{ s:{r:0,c:0}, e:{r:0,c:10} }];
+  ws['!cols']   = [{wch:16},{wch:12},{wch:14},{wch:28},{wch:14},{wch:9},{wch:9},{wch:12},{wch:12},{wch:11},{wch:20}];
+  ws['!rows']   = [{hpt:20},{hpt:18},{hpt:42}];
+
+  // ── شيت ثانٍ: جدول القيم المقبولة ──
+  const ws2 = XLSX.utils.aoa_to_sheet([]); ws2['!rightToLeft'] = true;
+  XLSX.utils.sheet_add_aoa(ws2, [
+    ['العمود','القيم المقبولة','ملاحظات'],
+    ['التاريخ','2026-05-21','صيغة YYYY-MM-DD فقط'],
+    ['النوع','سند أمتار','لتسجيل قراءة عداد'],
+    ['النوع','استلام','لاستلام مبلغ عهدة'],
+    ['النوع','تسليم','لتسليم مبلغ عهدة'],
+    ['النوع','مصروف','لتسجيل مصروف'],
+    ['الوردية','صباحي','وردية الصباح (7ص–7م)'],
+    ['الوردية','مسائي','وردية المساء (7م–7ص)'],
+    ['أمتار','رقم موجب','الكمية الأصلية بالمتر المكعب'],
+    ['خصم','رقم موجب أو 0','الكمية المخصومة من الأمتار'],
+    ['وارد','رقم موجب أو 0','المبلغ الداخل (فقط لـ استلام)'],
+    ['صادر','رقم موجب أو 0','المبلغ الخارج (مصروف أو تسليم)'],
+  ], { origin:'A1' });
+
+  ['A1','B1','C1'].forEach(k => { if(ws2[k]) ws2[k].s = S.hdr; });
+  for (let r=2; r<=12; r++) {
+    const alt = r%2===0;
+    ['A','B','C'].forEach(c => { if(ws2[c+r]) ws2[c+r].s = alt ? S.rowA : S.rowW; });
+  }
+  ws2['!cols'] = [{wch:14},{wch:22},{wch:35}];
+
+  const wb = _newWorkbook();
+  XLSX.utils.book_append_sheet(wb, ws,  'نموذج_الاستيراد');
+  XLSX.utils.book_append_sheet(wb, ws2, 'القيم المقبولة');
+  XLSX.writeFile(wb, 'نموذج_استيراد_مسار.xlsx');
+  _toast('✅ تم تحميل النموذج — افتحه وابدأ بإدخال بياناتك', 'ok');
+}
+
+// ══════════════════════════════
 // Audit Log Viewer
 // ══════════════════════════════
 export async function loadAuditLog() {
