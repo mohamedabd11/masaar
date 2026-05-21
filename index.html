@@ -135,9 +135,6 @@
       <button class="sb-item" data-page="pg-shifts" onclick="showPage(this)">
         <span class="si-icon">🔒</span><span class="si-label">إقفال الوردية</span>
       </button>
-      <button class="sb-item" data-page="pg-users" onclick="showPage(this)">
-        <span class="si-icon">👥</span><span class="si-label">إدارة المستخدمين</span>
-      </button>
       <button class="sb-item" data-page="pg-settings" onclick="showPage(this)">
         <span class="si-icon">⚙️</span><span class="si-label">الإعدادات</span>
       </button>
@@ -589,7 +586,13 @@
 
       <!-- ── إدارة المستخدمين ── -->
       <div id="pg-users" class="page">
-        <div class="pg-header"><h2>👥 إدارة المستخدمين</h2><p>أضف مستخدمين وحدد الأقسام التي يستطيعون الوصول إليها</p></div>
+        <div class="pg-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+          <div>
+            <h2 style="margin-bottom:4px">👥 إدارة المستخدمين</h2>
+            <p style="margin:0">أضف مستخدمين وحدد الأقسام التي يستطيعون الوصول إليها</p>
+          </div>
+          <button class="btn btn-ghost" onclick="navTo('pg-settings')" style="white-space:nowrap;font-size:.8rem;padding:7px 14px;margin-top:4px">⚙️ الإعدادات</button>
+        </div>
         <div class="setting-group">
           <div class="sg-h">👤 المستخدمون الحاليون</div>
           <div id="users-list"><div style="padding:16px;color:var(--text3);text-align:center">جاري التحميل...</div></div>
@@ -606,17 +609,34 @@
               </div>
             </div>
             <div style="margin-top:14px">
-              <div class="sdv">الأقسام المسموح بها لهذا المستخدم</div>
-              <div class="perm-grid-responsive">
-                <div class="perm-card" onclick="togglePerm(this,'pg-dash')"><div class="perm-icon">🏠</div><div class="perm-label">الصفحة الرئيسية</div><div class="perm-check-box"><span>✓</span></div><input type="checkbox" class="perm-check" value="pg-dash" style="display:none"></div>
-                <div class="perm-card" onclick="togglePerm(this,'pg-meters')"><div class="perm-icon">📏</div><div class="perm-label">سندات الأمتار</div><div class="perm-check-box"><span>✓</span></div><input type="checkbox" class="perm-check" value="pg-meters" style="display:none"></div>
-                <div class="perm-card" onclick="togglePerm(this,'pg-reconcile')"><div class="perm-icon">⚖️</div><div class="perm-label">مطابقة الكشف</div><div class="perm-check-box"><span>✓</span></div><input type="checkbox" class="perm-check" value="pg-reconcile" style="display:none"></div>
-                <div class="perm-card" onclick="togglePerm(this,'pg-custody')"><div class="perm-icon">🗂</div><div class="perm-label">العهدة</div><div class="perm-check-box"><span>✓</span></div><input type="checkbox" class="perm-check" value="pg-custody" style="display:none"></div>
-                <div class="perm-card" onclick="togglePerm(this,'pg-expense')"><div class="perm-icon">💸</div><div class="perm-label">المصروفات</div><div class="perm-check-box"><span>✓</span></div><input type="checkbox" class="perm-check" value="pg-expense" style="display:none"></div>
-                <div class="perm-card" onclick="togglePerm(this,'pg-ledger')"><div class="perm-icon">📒</div><div class="perm-label">سجل العمليات</div><div class="perm-check-box"><span>✓</span></div><input type="checkbox" class="perm-check" value="pg-ledger" style="display:none"></div>
-                <div class="perm-card" onclick="togglePerm(this,'pg-report')"><div class="perm-icon">📊</div><div class="perm-label">التقارير</div><div class="perm-check-box"><span>✓</span></div><input type="checkbox" class="perm-check" value="pg-report" style="display:none"></div>
+              <!-- محدد نوع المستخدم -->
+              <div class="sdv">نوع المستخدم</div>
+              <div class="ctypes" style="margin-bottom:8px">
+                <div class="ctype act-r" id="new-role-employee" onclick="setNewUserRole('employee')">
+                  <span class="cico">👤</span><span class="clbl">موظف</span>
+                </div>
+                <div class="ctype" id="new-role-manager" onclick="setNewUserRole('manager')">
+                  <span class="cico">👔</span><span class="clbl">مدير</span>
+                </div>
               </div>
-              <p style="font-size:.7rem;color:var(--text3);margin-top:8px">اضغط على القسم لتفعيله أو إلغائه</p>
+              <div id="new-role-desc" style="font-size:.7rem;color:var(--text3);padding:7px 10px;background:var(--b100);border-radius:var(--r2);border:1px solid var(--b200);margin-bottom:12px">
+                👤 موظف: يصل فقط للأقسام التي تحددها
+              </div>
+
+              <!-- شبكة الأقسام (تُخفى للمدير) -->
+              <div id="new-user-perm-wrap">
+                <div class="sdv">الأقسام المسموح بها لهذا المستخدم</div>
+                <div class="perm-grid-responsive">
+                  <div class="perm-card" onclick="togglePerm(this,'pg-dash')"><div class="perm-icon">🏠</div><div class="perm-label">الصفحة الرئيسية</div><div class="perm-check-box"><span>✓</span></div><input type="checkbox" class="perm-check" value="pg-dash" style="display:none"></div>
+                  <div class="perm-card" onclick="togglePerm(this,'pg-meters')"><div class="perm-icon">📏</div><div class="perm-label">سندات الأمتار</div><div class="perm-check-box"><span>✓</span></div><input type="checkbox" class="perm-check" value="pg-meters" style="display:none"></div>
+                  <div class="perm-card" onclick="togglePerm(this,'pg-reconcile')"><div class="perm-icon">⚖️</div><div class="perm-label">مطابقة الكشف</div><div class="perm-check-box"><span>✓</span></div><input type="checkbox" class="perm-check" value="pg-reconcile" style="display:none"></div>
+                  <div class="perm-card" onclick="togglePerm(this,'pg-custody')"><div class="perm-icon">🗂</div><div class="perm-label">العهدة</div><div class="perm-check-box"><span>✓</span></div><input type="checkbox" class="perm-check" value="pg-custody" style="display:none"></div>
+                  <div class="perm-card" onclick="togglePerm(this,'pg-expense')"><div class="perm-icon">💸</div><div class="perm-label">المصروفات</div><div class="perm-check-box"><span>✓</span></div><input type="checkbox" class="perm-check" value="pg-expense" style="display:none"></div>
+                  <div class="perm-card" onclick="togglePerm(this,'pg-ledger')"><div class="perm-icon">📒</div><div class="perm-label">سجل العمليات</div><div class="perm-check-box"><span>✓</span></div><input type="checkbox" class="perm-check" value="pg-ledger" style="display:none"></div>
+                  <div class="perm-card" onclick="togglePerm(this,'pg-report')"><div class="perm-icon">📊</div><div class="perm-label">التقارير</div><div class="perm-check-box"><span>✓</span></div><input type="checkbox" class="perm-check" value="pg-report" style="display:none"></div>
+                </div>
+                <p style="font-size:.7rem;color:var(--text3);margin-top:8px">اضغط على القسم لتفعيله أو إلغائه</p>
+              </div>
             </div>
             <div class="br" style="margin-top:14px">
               <button class="btn btn-blue" id="add-user-btn" onclick="addUser()">➕ إضافة المستخدم</button>
@@ -628,6 +648,19 @@
       <!-- ── الإعدادات ── -->
       <div id="pg-settings" class="page">
         <div class="pg-header"><h2>⚙️ الإعدادات</h2></div>
+
+        <!-- إدارة النظام -->
+        <div class="setting-group">
+          <div class="sg-h">🔐 إدارة النظام</div>
+          <div class="sg-row" style="cursor:pointer" onclick="navTo('pg-users')">
+            <span class="sg-ico">👥</span>
+            <div class="sg-info">
+              <div class="sg-label">إدارة المستخدمين</div>
+              <div class="sg-desc">إضافة مستخدمين وضبط صلاحياتهم وتفعيلهم أو تعطيلهم</div>
+            </div>
+            <button class="sg-btn" onclick="event.stopPropagation();navTo('pg-users')" style="background:var(--b600)">فتح ◀</button>
+          </div>
+        </div>
 
         <!-- حسابي -->
         <div class="setting-group">
@@ -818,15 +851,34 @@
 <div class="mo" id="edit-perms-mo">
   <div class="mo-box" style="max-width:420px">
     <h3 id="ep-title">✏️ تعديل الصلاحيات</h3>
-    <div class="perm-grid-responsive" style="margin-bottom:16px">
-      <div class="ep-perm-card perm-card" data-val="pg-dash" onclick="toggleEpPerm(this)"><div class="perm-icon">🏠</div><div class="perm-label">الصفحة الرئيسية</div><div class="perm-check-box"><span>✓</span></div><input type="checkbox" class="perm-check" value="pg-dash" style="display:none"></div>
-      <div class="ep-perm-card perm-card" data-val="pg-meters" onclick="toggleEpPerm(this)"><div class="perm-icon">📏</div><div class="perm-label">سندات الأمتار</div><div class="perm-check-box"><span>✓</span></div><input type="checkbox" class="perm-check" value="pg-meters" style="display:none"></div>
-      <div class="ep-perm-card perm-card" data-val="pg-reconcile" onclick="toggleEpPerm(this)"><div class="perm-icon">⚖️</div><div class="perm-label">مطابقة الكشف</div><div class="perm-check-box"><span>✓</span></div><input type="checkbox" class="perm-check" value="pg-reconcile" style="display:none"></div>
-      <div class="ep-perm-card perm-card" data-val="pg-custody" onclick="toggleEpPerm(this)"><div class="perm-icon">🗂</div><div class="perm-label">العهدة</div><div class="perm-check-box"><span>✓</span></div><input type="checkbox" class="perm-check" value="pg-custody" style="display:none"></div>
-      <div class="ep-perm-card perm-card" data-val="pg-expense" onclick="toggleEpPerm(this)"><div class="perm-icon">💸</div><div class="perm-label">المصروفات</div><div class="perm-check-box"><span>✓</span></div><input type="checkbox" class="perm-check" value="pg-expense" style="display:none"></div>
-      <div class="ep-perm-card perm-card" data-val="pg-ledger" onclick="toggleEpPerm(this)"><div class="perm-icon">📒</div><div class="perm-label">سجل العمليات</div><div class="perm-check-box"><span>✓</span></div><input type="checkbox" class="perm-check" value="pg-ledger" style="display:none"></div>
-      <div class="ep-perm-card perm-card" data-val="pg-report" onclick="toggleEpPerm(this)"><div class="perm-icon">📊</div><div class="perm-label">التقارير</div><div class="perm-check-box"><span>✓</span></div><input type="checkbox" class="perm-check" value="pg-report" style="display:none"></div>
+
+    <!-- محدد نوع المستخدم -->
+    <div style="margin-bottom:14px">
+      <div class="sdv" style="margin-bottom:6px">نوع المستخدم</div>
+      <div class="ctypes" style="margin-bottom:0">
+        <div class="ctype act-r" id="ep-role-employee" onclick="setEditUserRole('employee')">
+          <span class="cico">👤</span><span class="clbl">موظف</span>
+        </div>
+        <div class="ctype" id="ep-role-manager" onclick="setEditUserRole('manager')">
+          <span class="cico">👔</span><span class="clbl">مدير</span>
+        </div>
+      </div>
     </div>
+
+    <!-- شبكة الأقسام (تُخفى للمدير) -->
+    <div id="ep-perm-wrap" style="margin-bottom:16px">
+      <div class="sdv" style="margin-bottom:8px">الأقسام المسموح بها</div>
+      <div class="perm-grid-responsive">
+        <div class="ep-perm-card perm-card" data-val="pg-dash" onclick="toggleEpPerm(this)"><div class="perm-icon">🏠</div><div class="perm-label">الصفحة الرئيسية</div><div class="perm-check-box"><span>✓</span></div><input type="checkbox" class="perm-check" value="pg-dash" style="display:none"></div>
+        <div class="ep-perm-card perm-card" data-val="pg-meters" onclick="toggleEpPerm(this)"><div class="perm-icon">📏</div><div class="perm-label">سندات الأمتار</div><div class="perm-check-box"><span>✓</span></div><input type="checkbox" class="perm-check" value="pg-meters" style="display:none"></div>
+        <div class="ep-perm-card perm-card" data-val="pg-reconcile" onclick="toggleEpPerm(this)"><div class="perm-icon">⚖️</div><div class="perm-label">مطابقة الكشف</div><div class="perm-check-box"><span>✓</span></div><input type="checkbox" class="perm-check" value="pg-reconcile" style="display:none"></div>
+        <div class="ep-perm-card perm-card" data-val="pg-custody" onclick="toggleEpPerm(this)"><div class="perm-icon">🗂</div><div class="perm-label">العهدة</div><div class="perm-check-box"><span>✓</span></div><input type="checkbox" class="perm-check" value="pg-custody" style="display:none"></div>
+        <div class="ep-perm-card perm-card" data-val="pg-expense" onclick="toggleEpPerm(this)"><div class="perm-icon">💸</div><div class="perm-label">المصروفات</div><div class="perm-check-box"><span>✓</span></div><input type="checkbox" class="perm-check" value="pg-expense" style="display:none"></div>
+        <div class="ep-perm-card perm-card" data-val="pg-ledger" onclick="toggleEpPerm(this)"><div class="perm-icon">📒</div><div class="perm-label">سجل العمليات</div><div class="perm-check-box"><span>✓</span></div><input type="checkbox" class="perm-check" value="pg-ledger" style="display:none"></div>
+        <div class="ep-perm-card perm-card" data-val="pg-report" onclick="toggleEpPerm(this)"><div class="perm-icon">📊</div><div class="perm-label">التقارير</div><div class="perm-check-box"><span>✓</span></div><input type="checkbox" class="perm-check" value="pg-report" style="display:none"></div>
+      </div>
+    </div>
+
     <div class="br">
       <button class="btn btn-blue" id="ep-save-btn" onclick="saveEditPermissions()">💾 حفظ الصلاحيات</button>
       <button class="btn btn-ghost" onclick="closeMo('edit-perms-mo')">إلغاء</button>

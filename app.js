@@ -47,9 +47,10 @@ const ALL_PAGES = [
   { id:'pg-settings',   label:'⚙️ الإعدادات',         icon:'⚙️', adminOnly:true },
 ];
 const DEFAULT_PERMS = {
-  admin:  ['pg-dash','pg-meters','pg-reconcile','pg-custody','pg-expense','pg-ledger','pg-report','pg-shifts','pg-users','pg-settings'],
-  editor: ['pg-meters','pg-reconcile','pg-custody','pg-expense'],
-  viewer: ['pg-dash','pg-report'],
+  admin:   ['pg-dash','pg-meters','pg-reconcile','pg-custody','pg-expense','pg-ledger','pg-report','pg-shifts','pg-users','pg-settings'],
+  manager: ['pg-dash','pg-meters','pg-reconcile','pg-custody','pg-expense','pg-ledger','pg-report','pg-shifts'],
+  editor:  ['pg-meters','pg-reconcile','pg-custody','pg-expense'],
+  viewer:  ['pg-dash','pg-report'],
 };
 const PAGE_TITLES = {
   'pg-dash':'الرئيسية','pg-meters':'سندات الأمتار','pg-reconcile':'مطابقة الكشف',
@@ -169,7 +170,7 @@ function showApp(name, role, pages, user) {
   g('app-wrap')?.classList.remove('hidden');
 
   setEl('tb-username', name);
-  const roleAr = {admin:'مدير النظام', editor:'محرر', viewer:'مراقب'};
+  const roleAr = {admin:'مدير النظام', manager:'مدير', editor:'محرر', viewer:'مراقب'};
   setEl('tb-role-lbl', roleAr[role] || role);
   const av = g('tb-avatar'); if (av) av.textContent = name.charAt(0).toUpperCase();
 
@@ -209,18 +210,16 @@ function applyPermissions() {
     btn.style.display = currentPages.includes(btn.getAttribute('data-page')) ? '' : 'none';
   });
   document.querySelectorAll('.export-only').forEach(el => {
-    el.style.display = (currentRole==='admin' || currentPages.includes('pg-report')) ? '' : 'none';
+    el.style.display = (currentRole==='admin' || currentRole==='manager' || currentPages.includes('pg-report')) ? '' : 'none';
   });
 }
 
 // ── سجل التنقل (Stack للرجوع) ──
 const _navHistory = [];
 
-function showPage(btn) {
-  const pageId = btn.getAttribute('data-page');
+function _doNavigate(pageId) {
   if (!AppState.currentPages.includes(pageId)) return;
 
-  // حفظ الصفحة الحالية للرجوع إليها
   const prev = AppState.currentPageId;
   if (prev && prev !== pageId) {
     _navHistory.push(prev);
@@ -228,7 +227,6 @@ function showPage(btn) {
   }
   AppState.currentPageId = pageId;
 
-  // تفعيل الصفحة
   document.querySelectorAll('.sb-item').forEach(b =>
     b.classList.toggle('active', b.getAttribute('data-page') === pageId));
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -237,7 +235,6 @@ function showPage(btn) {
   setEl('pg-title', PAGE_TITLES[pageId] || '');
   closeSidebar();
 
-  // تحديثات خاصة بكل صفحة
   if (pageId === 'pg-users')     renderUsersList();
   if (pageId === 'pg-shifts')    renderShifts();
   if (pageId === 'pg-settings')  _populateSettingsPage();
@@ -245,17 +242,16 @@ function showPage(btn) {
   if (pageId === 'pg-reconcile') { if (!g('rec-input-tbody')?.children.length) addRecRow(); }
 }
 
-function navTo(pageId) {
-  const btn = document.querySelector(`.sb-item[data-page="${pageId}"]`);
-  if (btn) showPage(btn);
-}
+function showPage(btn) { _doNavigate(btn.getAttribute('data-page')); }
+
+function navTo(pageId) { _doNavigate(pageId); }
 
 function _populateSettingsPage() {
   const un = g('tb-username');
   if (un && g('s-username')) {
     setEl('s-username', un.textContent || '—');
     setEl('s-email',    AppState.currentUser?.email || '—');
-    setEl('s-role-badge', {admin:'مدير',editor:'محرر',viewer:'مراقب'}[AppState.currentRole] || AppState.currentRole || '—');
+    setEl('s-role-badge', {admin:'مدير النظام',manager:'مدير',editor:'محرر',viewer:'مراقب'}[AppState.currentRole] || AppState.currentRole || '—');
   }
 }
 
@@ -265,7 +261,7 @@ function _populateSettingsPage() {
 function subscribeToEntries() {
   if (AppState.unsubEntries) AppState.unsubEntries();
   const { currentUser, currentRole } = AppState;
-  const q = currentRole === 'admin'
+  const q = (currentRole === 'admin' || currentRole === 'manager')
     ? query(collection(db, COLL.ENTRIES))
     : query(collection(db, COLL.ENTRIES), where('createdBy','==',currentUser.email));
 
@@ -447,6 +443,11 @@ function confirmDel(id) {
 
 async function _executeDelete() {
   if (!_pendingDelId) return;
+  const _entry = AppState.entries.find(e => e.id === _pendingDelId);
+  if (_entry && AppState.currentRole === 'manager' && _entry.createdBy !== AppState.currentUser?.email) {
+    toast('⚠ لا يمكنك حذف عمليات مستخدمين آخرين', 'err');
+    _pendingDelId = null; closeMo('confirm-mo'); return;
+  }
   try {
     await deleteDoc(doc(db, COLL.ENTRIES, _pendingDelId));
     const id = _pendingDelId;
@@ -462,6 +463,9 @@ let _editId = null;
 function openEdit(id) {
   const e = AppState.entries.find(x => x.id === id);
   if (!e) return;
+  if (AppState.currentRole === 'manager' && e.createdBy !== AppState.currentUser?.email) {
+    toast('⚠ لا يمكنك تعديل عمليات مستخدمين آخرين', 'err'); return;
+  }
   _editId = id;
   const fields = { 'ed-date':e.date||'', 'ed-ref':e.ref||'', 'ed-desc':e.desc||'',
                    'ed-deb':e.deb||'', 'ed-crd':e.crd||'', 'ed-met':e.met||'', 'ed-notes':e.notes||'' };
@@ -682,6 +686,32 @@ window.addEventListener('unhandledrejection', event => {
 // WINDOW ASSIGNMENTS — تعيين الدوال لـ window
 // (مطلوبة لـ onclick="" في HTML)
 // ══════════════════════════════════════════════
+window.setNewUserRole = function(type) {
+  window._newUserRoleType = type;
+  const isManager = type === 'manager';
+  const permWrap = g('new-user-perm-wrap');
+  if (permWrap) permWrap.style.display = isManager ? 'none' : '';
+  const desc = g('new-role-desc');
+  if (desc) desc.textContent = isManager
+    ? '👔 مدير: يرى كل البيانات ويستطيع تصدير تقارير الموظفين، لكن لا يملك صلاحية تعديل أو حذف عمليات الآخرين'
+    : '👤 موظف: يصل فقط للأقسام التي تحددها';
+  const eBtn = g('new-role-employee');
+  const mBtn = g('new-role-manager');
+  if (eBtn) eBtn.className = 'ctype' + (!isManager ? ' act-r' : '');
+  if (mBtn) mBtn.className = 'ctype' + (isManager  ? ' act-r' : '');
+};
+
+window.setEditUserRole = function(type) {
+  window._editUserRoleType = type;
+  const isManager = type === 'manager';
+  const permWrap = g('ep-perm-wrap');
+  if (permWrap) permWrap.style.display = isManager ? 'none' : '';
+  const eBtn = g('ep-role-employee');
+  const mBtn = g('ep-role-manager');
+  if (eBtn) eBtn.className = 'ctype' + (!isManager ? ' act-r' : '');
+  if (mBtn) mBtn.className = 'ctype' + (isManager  ? ' act-r' : '');
+};
+
 window.doLogin              = doLogin;
 window.doLogout             = () => doLogout(AppState.unsubEntries);
 window.showPage             = showPage;
@@ -768,9 +798,11 @@ document.addEventListener('DOMContentLoaded', () => {
   initAuth(onLoginSuccess, onLogout, DEFAULT_PERMS);
 
   // تهيئة الـ state الأولية للنماذج
-  window._cType      = 'r';
-  window._cPayMethod = 'cash';
-  window._eType      = 'fuel';
+  window._cType          = 'r';
+  window._cPayMethod     = 'cash';
+  window._eType          = 'fuel';
+  window._newUserRoleType = 'employee';
+  window._editUserRoleType = 'employee';
 
   // زر الحذف في modal التأكيد
   const delBtn = g('confirm-del-btn');

@@ -406,7 +406,7 @@ async function renderActivityLog() {
   const card = g('r-activity')?.closest('.card');
   const el   = g('r-activity');
   if (!el) return;
-  if (currentRole !== 'admin') { if (card) card.style.display = 'none'; return; }
+  if (currentRole !== 'admin' && currentRole !== 'manager') { if (card) card.style.display = 'none'; return; }
   if (card) card.style.display = '';
 
   el.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text3);font-size:.8rem">جاري التحميل...</div>';
