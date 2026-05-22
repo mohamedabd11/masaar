@@ -8,121 +8,85 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── دوال مساعدة ──
-    function isAuth() {
-      return request.auth != null;
-    }
-
-    function myUid() {
-      return request.auth.uid;
-    }
-
-    function myEmail() {
-      return request.auth.token.email;
-    }
-
-    // قراءة بيانات المستخدم الحالي من مجموعة users
-    function myUserData() {
-      return get(/databases/$(database)/documents/users/$(myUid())).data;
-    }
-
-    function isAdmin() {
-      return isAuth() && myUserData().role == 'admin';
-    }
-
-    function isManager() {
-      return isAuth() && myUserData().role == 'manager';
-    }
-
-    function isEditor() {
-      return isAuth() && myUserData().role == 'editor';
-    }
-
-    function isViewer() {
-      return isAuth() && myUserData().role == 'viewer';
-    }
-
-    function isActiveUser() {
-      let data = myUserData();
-      return isAuth() && data.deleted != true && data.active != false;
-    }
-
-    function canWrite() {
-      let data = myUserData();
-      return isAuth() && data.deleted != true && data.active != false
-        && (data.role == 'admin' || data.role == 'manager' || data.role == 'editor' || data.role == 'custom');
+    // استدعاء واحد لبيانات المستخدم — يُخزَّن في متغير محلي لتجنب قراءتين
+    function ud() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
     // ══════════════════════════════════════════
     // مجموعة entries — السندات والعهدة والمصروفات
     // ══════════════════════════════════════════
     match /entries/{entryId} {
-      // Admin والمدير يقرآن كل شيء — المحررون/المخصصون يقرأون فقط سجلاتهم
-      allow read: if isAuth() && isActiveUser() && (
-        isAdmin() || isManager() || resource.data.createdBy == myEmail()
+      allow read: if request.auth != null && (
+        let d = ud();
+        d.deleted != true && d.active != false &&
+        (d.role == 'admin' || d.role == 'manager' || resource.data.createdBy == request.auth.token.email)
       );
 
-      // إنشاء: فقط للمستخدمين النشطين القادرين على الكتابة
-      allow create: if canWrite() && (
-        // التحقق أن createdBy يطابق بريد المستخدم الحالي
-        request.resource.data.createdBy == myEmail()
+      allow create: if request.auth != null && (
+        let d = ud();
+        d.deleted != true && d.active != false &&
+        (d.role == 'admin' || d.role == 'manager' || d.role == 'editor' || d.role == 'custom') &&
+        request.resource.data.createdBy == request.auth.token.email
       );
 
-      // تعديل وحذف: Admin فقط
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow update: if request.auth != null && ud().role == 'admin';
+      allow delete: if request.auth != null && ud().role == 'admin';
     }
 
     // ══════════════════════════════════════════
     // مجموعة users — حسابات المستخدمين
     // ══════════════════════════════════════════
     match /users/{userId} {
-      // كل مستخدم يقرأ بياناته الخاصة — Admin يقرأ الكل
-      allow read: if isAuth() && (
-        myUid() == userId || isAdmin()
+      allow read: if request.auth != null && (
+        request.auth.uid == userId || ud().role == 'admin'
       );
 
-      // إنشاء: Admin أو المستخدم الأول (لا يوجد حسابات بعد)
-      allow create: if isAuth() && (
-        isAdmin() ||
-        // السماح بإنشاء أول حساب admin
+      allow create: if request.auth != null && (
+        ud().role == 'admin' ||
         !exists(/databases/$(database)/documents/users/$(userId))
       );
 
-      // تعديل وحذف: Admin فقط
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow update: if request.auth != null && ud().role == 'admin';
+      allow delete: if request.auth != null && ud().role == 'admin';
     }
 
     // ══════════════════════════════════════════
     // مجموعة settings — إعدادات النظام
     // ══════════════════════════════════════════
     match /settings/{docId} {
-      // كل المستخدمين المفعّلين يقرأون
-      allow read: if isAuth() && isActiveUser();
-      // Admin فقط يعدّل
-      allow write: if isAdmin();
+      allow read: if request.auth != null && (
+        let d = ud();
+        d.deleted != true && d.active != false
+      );
+      allow write: if request.auth != null && ud().role == 'admin';
     }
 
     // ══════════════════════════════════════════
     // مجموعة shifts — إقفالات الوردية
     // ══════════════════════════════════════════
     match /shifts/{shiftId} {
-      allow read:   if isAuth() && isActiveUser();
-      allow create: if isAdmin() || isManager();
-      allow update, delete: if isAdmin();
+      allow read: if request.auth != null && (
+        let d = ud();
+        d.deleted != true && d.active != false
+      );
+      allow create: if request.auth != null && (
+        let role = ud().role;
+        role == 'admin' || role == 'manager'
+      );
+      allow update, delete: if request.auth != null && ud().role == 'admin';
     }
 
     // ══════════════════════════════════════════
     // مجموعة auditLog — سجل المراجعة
     // ══════════════════════════════════════════
     match /auditLog/{logId} {
-      // Admin فقط يقرأ سجل المراجعة
-      allow read: if isAdmin();
-      // أي مستخدم نشط يضيف — performedBy يجب أن يطابق بريده
-      allow create: if isAuth() && isActiveUser()
-        && request.resource.data.performedBy == myEmail();
-      // لا يمكن تعديل أو حذف سجلات المراجعة
+      allow read: if request.auth != null && ud().role == 'admin';
+      allow create: if request.auth != null && (
+        let d = ud();
+        d.deleted != true && d.active != false &&
+        request.resource.data.performedBy == request.auth.token.email
+      );
       allow update, delete: if false;
     }
 
