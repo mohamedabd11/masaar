@@ -8,85 +8,71 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // استدعاء واحد لبيانات المستخدم — يُخزَّن في متغير محلي لتجنب قراءتين
     function ud() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
-    // ══════════════════════════════════════════
-    // مجموعة entries — السندات والعهدة والمصروفات
-    // ══════════════════════════════════════════
+    function isAdminActive() {
+      let d = ud();
+      return d.deleted != true && d.active != false && d.role == 'admin';
+    }
+
+    function isManagerActive() {
+      let d = ud();
+      return d.deleted != true && d.active != false && d.role == 'manager';
+    }
+
+    function isActiveUser() {
+      let d = ud();
+      return d.deleted != true && d.active != false;
+    }
+
+    function canWrite() {
+      let d = ud();
+      return d.deleted != true && d.active != false &&
+             (d.role == 'admin' || d.role == 'manager' ||
+              d.role == 'editor' || d.role == 'custom');
+    }
+
     match /entries/{entryId} {
-      allow read: if request.auth != null && (
-        let d = ud();
-        d.deleted != true && d.active != false &&
-        (d.role == 'admin' || d.role == 'manager' || resource.data.createdBy == request.auth.token.email)
-      );
+      allow read: if request.auth != null &&
+        (isAdminActive() || isManagerActive() ||
+         (isActiveUser() && resource.data.createdBy == request.auth.token.email));
 
-      allow create: if request.auth != null && (
-        let d = ud();
-        d.deleted != true && d.active != false &&
-        (d.role == 'admin' || d.role == 'manager' || d.role == 'editor' || d.role == 'custom') &&
-        request.resource.data.createdBy == request.auth.token.email
-      );
+      allow create: if request.auth != null && canWrite() &&
+        request.resource.data.createdBy == request.auth.token.email;
 
-      allow update: if request.auth != null && ud().role == 'admin';
-      allow delete: if request.auth != null && ud().role == 'admin';
+      allow update: if request.auth != null && isAdminActive();
+      allow delete: if request.auth != null && isAdminActive();
     }
 
-    // ══════════════════════════════════════════
-    // مجموعة users — حسابات المستخدمين
-    // ══════════════════════════════════════════
     match /users/{userId} {
-      allow read: if request.auth != null && (
-        request.auth.uid == userId || ud().role == 'admin'
-      );
+      allow read: if request.auth != null &&
+        (request.auth.uid == userId || isAdminActive());
 
-      allow create: if request.auth != null && (
-        ud().role == 'admin' ||
-        !exists(/databases/$(database)/documents/users/$(userId))
-      );
+      allow create: if request.auth != null &&
+        (isAdminActive() ||
+         !exists(/databases/$(database)/documents/users/$(userId)));
 
-      allow update: if request.auth != null && ud().role == 'admin';
-      allow delete: if request.auth != null && ud().role == 'admin';
+      allow update: if request.auth != null && isAdminActive();
+      allow delete: if request.auth != null && isAdminActive();
     }
 
-    // ══════════════════════════════════════════
-    // مجموعة settings — إعدادات النظام
-    // ══════════════════════════════════════════
     match /settings/{docId} {
-      allow read: if request.auth != null && (
-        let d = ud();
-        d.deleted != true && d.active != false
-      );
-      allow write: if request.auth != null && ud().role == 'admin';
+      allow read: if request.auth != null && isActiveUser();
+      allow write: if request.auth != null && isAdminActive();
     }
 
-    // ══════════════════════════════════════════
-    // مجموعة shifts — إقفالات الوردية
-    // ══════════════════════════════════════════
     match /shifts/{shiftId} {
-      allow read: if request.auth != null && (
-        let d = ud();
-        d.deleted != true && d.active != false
-      );
-      allow create: if request.auth != null && (
-        let role = ud().role;
-        role == 'admin' || role == 'manager'
-      );
-      allow update, delete: if request.auth != null && ud().role == 'admin';
+      allow read:   if request.auth != null && isActiveUser();
+      allow create: if request.auth != null && (isAdminActive() || isManagerActive());
+      allow update, delete: if request.auth != null && isAdminActive();
     }
 
-    // ══════════════════════════════════════════
-    // مجموعة auditLog — سجل المراجعة
-    // ══════════════════════════════════════════
     match /auditLog/{logId} {
-      allow read: if request.auth != null && ud().role == 'admin';
-      allow create: if request.auth != null && (
-        let d = ud();
-        d.deleted != true && d.active != false &&
-        request.resource.data.performedBy == request.auth.token.email
-      );
+      allow read: if request.auth != null && isAdminActive();
+      allow create: if request.auth != null && isActiveUser() &&
+        request.resource.data.performedBy == request.auth.token.email;
       allow update, delete: if false;
     }
 
