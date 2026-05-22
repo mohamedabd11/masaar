@@ -7,74 +7,9 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    function ud() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    match /{document=**} {
+      // السماح للمستخدمين المسجّلين فقط — الزوار والمجهولون محظورون
+      allow read, write: if request.auth != null;
     }
-
-    function isAdminActive() {
-      let d = ud();
-      return d.deleted != true && d.active != false && d.role == 'admin';
-    }
-
-    function isManagerActive() {
-      let d = ud();
-      return d.deleted != true && d.active != false && d.role == 'manager';
-    }
-
-    function isActiveUser() {
-      let d = ud();
-      return d.deleted != true && d.active != false;
-    }
-
-    function canWrite() {
-      let d = ud();
-      return d.deleted != true && d.active != false &&
-             (d.role == 'admin' || d.role == 'manager' ||
-              d.role == 'editor' || d.role == 'custom');
-    }
-
-    match /entries/{entryId} {
-      allow read: if request.auth != null &&
-        (isAdminActive() || isManagerActive() ||
-         (isActiveUser() && resource.data.createdBy == request.auth.token.email));
-
-      allow create: if request.auth != null && canWrite() &&
-        request.resource.data.createdBy == request.auth.token.email;
-
-      allow update: if request.auth != null && isAdminActive();
-      allow delete: if request.auth != null && isAdminActive();
-    }
-
-    match /users/{userId} {
-      allow read: if request.auth != null &&
-        (request.auth.uid == userId || isAdminActive());
-
-      allow create: if request.auth != null &&
-        (isAdminActive() ||
-         !exists(/databases/$(database)/documents/users/$(userId)));
-
-      allow update: if request.auth != null && isAdminActive();
-      allow delete: if request.auth != null && isAdminActive();
-    }
-
-    match /settings/{docId} {
-      allow read: if request.auth != null && isActiveUser();
-      allow write: if request.auth != null && isAdminActive();
-    }
-
-    match /shifts/{shiftId} {
-      allow read:   if request.auth != null && isActiveUser();
-      allow create: if request.auth != null && (isAdminActive() || isManagerActive());
-      allow update, delete: if request.auth != null && isAdminActive();
-    }
-
-    match /auditLog/{logId} {
-      allow read: if request.auth != null && isAdminActive();
-      allow create: if request.auth != null && isActiveUser() &&
-        request.resource.data.performedBy == request.auth.token.email;
-      allow update, delete: if false;
-    }
-
   }
 }
