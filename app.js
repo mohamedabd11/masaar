@@ -475,14 +475,16 @@ function openEdit(id) {
 
 async function saveEdit() {
   if (!_editId) return;
+  const deb = parseFloat(g('ed-deb')?.value) || 0;
+  const crd = parseFloat(g('ed-crd')?.value) || 0;
+  const met = parseFloat(g('ed-met')?.value) || 0;
+  if (deb < 0 || crd < 0 || met < 0) { toast('⚠ لا يمكن إدخال قيم سالبة','err'); return; }
   try {
     await updateDoc(doc(db, COLL.ENTRIES, _editId), {
       date:  g('ed-date')?.value  || '',
       ref:   g('ed-ref')?.value   || '',
       desc:  g('ed-desc')?.value  || '',
-      deb:   parseFloat(g('ed-deb')?.value)   || 0,
-      crd:   parseFloat(g('ed-crd')?.value)   || 0,
-      met:   parseFloat(g('ed-met')?.value)   || 0,
+      deb, crd, met,
       notes: g('ed-notes')?.value || '',
       updatedBy: AppState.currentUser?.email,
       updatedAt: new Date().toISOString()
@@ -523,6 +525,7 @@ async function saveSettings() {
 }
 
 async function deleteAllData() {
+  if (AppState.currentRole !== 'admin') { toast('⚠ هذا الإجراء متاح لمدير النظام فقط','err'); return; }
   if (!confirm('⚠ حذف جميع البيانات؟\nهذا الإجراء لا يمكن التراجع عنه!\nتأكد من تصدير النسخة الاحتياطية أولاً.')) return;
   if (!confirm('تأكيد نهائي: حذف كل السندات والعهدة والمصروفات؟')) return;
   const btn = g('delete-all-btn');

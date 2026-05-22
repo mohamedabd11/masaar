@@ -113,7 +113,7 @@ export async function doLogin() {
   const btn     = document.getElementById('login-btn');
 
   const email = (emailEl?.value || '').trim().toLowerCase();
-  const pass  = (passEl?.value  || '').trim();
+  const pass  = passEl?.value || '';
 
   errEl?.classList.remove('show');
 

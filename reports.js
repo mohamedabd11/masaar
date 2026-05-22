@@ -162,7 +162,7 @@ export function renderExpenses(loadMore = false) {
       <td style="color:var(--text3);font-size:.7rem">${rows.length - i}</td>
       <td>${fD(e.date)}</td>
       <td><strong>${_esc(e.ref) || '—'}</strong></td>
-      <td><span class="badge badge-exp">${label}</span></td>
+      <td><span class="badge badge-exp">${_esc(label)}</span></td>
       <td style="text-align:right">${_esc(e.desc)}</td>
       <td class="td-crd">${fEN(e.crd)}</td>
       <td class="${bCls(b)}">${fEN(b)}</td>
@@ -231,7 +231,7 @@ export function renderLedger(loadMore = false) {
       <td>${fD(e.date)}</td>
       <td><strong>${_esc(e.ref) || '—'}</strong></td>
       <td style="color:var(--text2);font-weight:700">${_esc(plate)}</td>
-      <td><span class="badge ${bCl}">${label}</span></td>
+      <td><span class="badge ${bCl}">${_esc(label)}</span></td>
       <td style="text-align:right;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(e.desc)}</td>
       <td style="color:var(--b600);font-weight:700">${e.met ? e.met+'م' : '—'}</td>
       <td class="td-deb">${e.deb ? fEN(e.deb) : ''}</td>
@@ -583,7 +583,7 @@ export function renderUserReportTable() {
       <td>${fD(e.date)}</td>
       <td><strong>${_esc(e.ref)||'—'}</strong></td>
       <td>${_esc(plate)}</td>
-      <td><span class="badge badge-${e.type==='meter'?'meter':e.type==='expense'?'exp':e.type==='custody_r'?'in':'out'}" style="font-size:.65rem">${label}</span></td>
+      <td><span class="badge badge-${e.type==='meter'?'meter':e.type==='expense'?'exp':e.type==='custody_r'?'in':'out'}" style="font-size:.65rem">${_esc(label)}</span></td>
       <td style="text-align:right;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(e.desc)||'—'}</td>
       <td style="color:var(--b600);font-weight:700">${e.met?e.met+'م':'—'}</td>
       <td class="td-deb">${e.deb?fEN(e.deb):''}</td>

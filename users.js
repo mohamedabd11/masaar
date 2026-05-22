@@ -39,8 +39,8 @@ export async function addUser() {
   if (pass.length < 6) { toast('⚠ كلمة المرور 6 أحرف على الأقل','err'); return; }
   if (!adminP)         { toast('⚠ أدخل كلمة مرورك الحالية للتأكيد','err'); return; }
 
-  // تحديد نوع المستخدم: مدير أو موظف
-  const roleType = window._newUserRoleType || 'employee';
+  // تحديد نوع المستخدم: مدير أو موظف — يُقرأ من DOM مباشرة
+  const roleType = g('new-role-manager')?.classList.contains('act-r') ? 'manager' : 'employee';
   let userRole, customPages;
   if (roleType === 'manager') {
     userRole    = 'manager';
@@ -263,7 +263,7 @@ export async function saveEditPermissions() {
   const name = mo?._name;
   if (!uid) { toast('⚠ خطأ في البيانات','err'); return; }
 
-  const roleType = window._editUserRoleType || 'employee';
+  const roleType = g('ep-role-manager')?.classList.contains('act-r') ? 'manager' : 'employee';
   let userRole, customPages;
   if (roleType === 'manager') {
     userRole    = 'manager';

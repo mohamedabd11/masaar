@@ -30,6 +30,10 @@ service cloud.firestore {
       return isAuth() && myUserData().role == 'admin';
     }
 
+    function isManager() {
+      return isAuth() && myUserData().role == 'manager';
+    }
+
     function isEditor() {
       return isAuth() && myUserData().role == 'editor';
     }
@@ -46,16 +50,16 @@ service cloud.firestore {
     function canWrite() {
       let data = myUserData();
       return isAuth() && data.deleted != true && data.active != false
-        && (data.role == 'admin' || data.role == 'editor' || data.role == 'custom');
+        && (data.role == 'admin' || data.role == 'manager' || data.role == 'editor' || data.role == 'custom');
     }
 
     // ══════════════════════════════════════════
     // مجموعة entries — السندات والعهدة والمصروفات
     // ══════════════════════════════════════════
     match /entries/{entryId} {
-      // Admin يقرأ كل شيء — المحررون/المخصصون يقرأون فقط سجلاتهم
+      // Admin والمدير يقرآن كل شيء — المحررون/المخصصون يقرأون فقط سجلاتهم
       allow read: if isAuth() && isActiveUser() && (
-        isAdmin() || resource.data.createdBy == myEmail()
+        isAdmin() || isManager() || resource.data.createdBy == myEmail()
       );
 
       // إنشاء: فقط للمستخدمين النشطين القادرين على الكتابة
@@ -105,7 +109,7 @@ service cloud.firestore {
     // ══════════════════════════════════════════
     match /shifts/{shiftId} {
       allow read:   if isAuth() && isActiveUser();
-      allow create: if isAuth() && isActiveUser();
+      allow create: if isAdmin() || isManager();
       allow update, delete: if isAdmin();
     }
 
@@ -115,8 +119,9 @@ service cloud.firestore {
     match /auditLog/{logId} {
       // Admin فقط يقرأ سجل المراجعة
       allow read: if isAdmin();
-      // أي مستخدم نشط يضيف (للتسجيل التلقائي)
-      allow create: if isAuth() && isActiveUser();
+      // أي مستخدم نشط يضيف — performedBy يجب أن يطابق بريده
+      allow create: if isAuth() && isActiveUser()
+        && request.resource.data.performedBy == myEmail();
       // لا يمكن تعديل أو حذف سجلات المراجعة
       allow update, delete: if false;
     }
