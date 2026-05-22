@@ -7,6 +7,11 @@ import {
   collection, addDoc, getDocs, doc, deleteDoc
 } from './firebase.js';
 
+function _esc(str) {
+  if (!str && str !== 0) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 let _ctx = null;
 
 export function initShifts(ctx) {
@@ -160,16 +165,16 @@ export async function renderShifts() {
 
       return `<div class="shift-row">
         <div class="shift-hd">
-          <span class="shift-user">${s.closedByName || s.closedBy}</span>
+          <span class="shift-user">${_esc(s.closedByName || s.closedBy)}</span>
           <span class="shift-badge" style="${diffBadge};border:1px solid currentColor">الفارق: ${s.variance >= 0 ? '+' : ''}${fEN(s.variance)} ر.س</span>
         </div>
-        <div class="shift-time">📅 ${dt} ${s.forUser && s.forUser !== '__all__' ? `| 👤 ${s.forUser}` : ''}</div>
+        <div class="shift-time">📅 ${dt} ${s.forUser && s.forUser !== '__all__' ? `| 👤 ${_esc(s.forUser)}` : ''}</div>
         <div class="shift-stats">
           <div class="sst"><div class="sst-l">الرصيد النظامي</div><div class="sst-v">${fEN(s.systemBalance)} ر.س</div></div>
           <div class="sst"><div class="sst-l">المبلغ الفعلي</div><div class="sst-v">${fEN(s.actualAmount)} ر.س</div></div>
           <div class="sst"><div class="sst-l">الفارق</div><div class="sst-v" style="${diffBadge};padding:3px 6px;border-radius:6px">${s.variance >= 0 ? '+' : ''}${fEN(s.variance)}</div></div>
         </div>
-        ${s.notes ? `<div class="shift-note">📝 ${s.notes}</div>` : ''}
+        ${s.notes ? `<div class="shift-note">📝 ${_esc(s.notes)}</div>` : ''}
         ${AppState.currentRole === 'admin' ? `<div style="margin-top:8px"><button class="sg-btn danger" style="font-size:.68rem;padding:3px 10px" onclick="deleteShiftRecord('${s.id}')">🗑 حذف</button></div>` : ''}
       </div>`;
     }).join('');

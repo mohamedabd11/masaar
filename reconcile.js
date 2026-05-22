@@ -5,6 +5,11 @@
 let _ctx  = null;
 let _rows = [];
 
+function _esc(str) {
+  if (!str && str !== 0) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 export function initReconcile(ctx) {
   _ctx  = ctx;
   _rows = [];
@@ -70,8 +75,8 @@ function _renderTable() {
   tb.innerHTML = _rows.map((r, i) => `<tr>
     <td>${r.slNo || i + 1}</td>
     <td><input type="date" value="${r.date}" oninput="_recRowUpdate(${i},'date',this.value)" style="min-width:120px;padding:5px 8px;font-size:.8rem"></td>
-    <td><input type="text" value="${r.truck}" placeholder="رقم الشاحنة" oninput="_recRowUpdate(${i},'truck',this.value)" style="min-width:100px;padding:5px 8px;font-size:.8rem"></td>
-    <td><input type="text" value="${r.tripSheet}" placeholder="رقم القسيمة" oninput="_recRowUpdate(${i},'tripSheet',this.value)" style="min-width:100px;padding:5px 8px;font-size:.8rem"></td>
+    <td><input type="text" value="${_esc(r.truck)}" placeholder="رقم الشاحنة" oninput="_recRowUpdate(${i},'truck',this.value)" style="min-width:100px;padding:5px 8px;font-size:.8rem"></td>
+    <td><input type="text" value="${_esc(r.tripSheet)}" placeholder="رقم القسيمة" oninput="_recRowUpdate(${i},'tripSheet',this.value)" style="min-width:100px;padding:5px 8px;font-size:.8rem"></td>
     <td><input type="number" value="${r.rawM || ''}" placeholder="0" min="0" step="0.5" oninput="_recRowUpdate(${i},'rawM',parseFloat(this.value)||0);window.calcRecRow(${i})" style="min-width:90px;padding:5px 8px;font-size:.8rem"></td>
     <td><input type="number" value="${r.deducted || ''}" placeholder="0" min="0" step="0.5" oninput="_recRowUpdate(${i},'deducted',parseFloat(this.value)||0);window.calcRecRow(${i})" style="min-width:90px;padding:5px 8px;font-size:.8rem"></td>
     <td style="font-weight:800;color:var(--b600)">${r.certM || 0}م</td>

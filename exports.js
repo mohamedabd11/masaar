@@ -13,6 +13,11 @@ const g    = id => document.getElementById(id);
 const get  = ()  => _ctx.getState();
 const h    = ()  => _ctx.helpers;
 
+function _esc(str) {
+  if (!str && str !== 0) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 /** الحصول على الإدخالات المفلترة حسب التاريخ */
 function getFilteredEntries() {
   const { entries } = get();
@@ -134,14 +139,15 @@ export function exportPDF() {
   const rows = exportEntries.map((e,i) => {
     const plate = e.type==='meter'&&e.notes ? (e.notes.split('|')[0].replace('لوحة:','').trim()||'—') : '—';
     const b     = bals[e.id]||0;
-    return `<tr><td>${i+1}</td><td>${fD(e.date)}</td><td>${e.ref||'—'}</td><td>${plate}</td>
-      <td>${e.type==='expense'?(e.etLabel||EL[e.et]||'أخرى'):(TL[e.type]||e.type)}</td>
-      <td style="text-align:right">${e.desc||''}</td>
+    const label = e.type==='expense'?(_esc(e.etLabel||EL[e.et]||'أخرى')):(_esc(TL[e.type]||e.type));
+    return `<tr><td>${i+1}</td><td>${fD(e.date)}</td><td>${_esc(e.ref)||'—'}</td><td>${_esc(plate)}</td>
+      <td>${label}</td>
+      <td style="text-align:right">${_esc(e.desc)||''}</td>
       <td style="color:#1d4ed8;font-weight:700">${e.met?e.met+'م':'—'}</td>
       <td style="color:#15803d;font-weight:700">${e.deb?fEN(e.deb):''}</td>
       <td style="color:#b91c1c;font-weight:700">${e.crd?fEN(e.crd):''}</td>
       <td style="font-weight:800;color:${b>=0?'#15803d':'#b91c1c'}">${fEN(b)}</td>
-      <td style="color:#1d4ed8;font-size:8px">${e.createdByName||'—'}</td></tr>`;
+      <td style="color:#1d4ed8;font-size:8px">${_esc(e.createdByName)||'—'}</td></tr>`;
   }).join('');
 
   const cntM = entries.filter(e=>e.type==='meter').length;
@@ -204,7 +210,7 @@ export function exportShortPDF() {
   const expTotal = Object.values(expMap).reduce((s,v)=>s+v,0);
   const expBars  = Object.entries(expMap).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([k,v])=>{
     const pct = expTotal ? Math.round(v/expTotal*100) : 0;
-    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><div style="width:80px;font-size:8px;text-align:right;flex-shrink:0">${k}</div><div style="flex:1;background:#e2e8f0;border-radius:3px;height:10px"><div style="background:#1d4ed8;width:${pct}%;height:100%;border-radius:3px"></div></div><div style="font-size:8px;width:45px;text-align:left">${v.toFixed(0)} ر.س</div></div>`;
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><div style="width:80px;font-size:8px;text-align:right;flex-shrink:0">${_esc(k)}</div><div style="flex:1;background:#e2e8f0;border-radius:3px;height:10px"><div style="background:#1d4ed8;width:${pct}%;height:100%;border-radius:3px"></div></div><div style="font-size:8px;width:45px;text-align:left">${v.toFixed(0)} ر.س</div></div>`;
   }).join('');
 
   const maxV = Math.max(totD, totC, 1);
@@ -329,7 +335,7 @@ export function exportUserReportPDF() {
   const expBars  = Object.entries(expMap).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([k,v])=>{
     const pct = expTotal ? Math.round(v/expTotal*100) : 0;
     return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
-      <div style="width:75px;font-size:8px;text-align:right;flex-shrink:0">${k}</div>
+      <div style="width:75px;font-size:8px;text-align:right;flex-shrink:0">${_esc(k)}</div>
       <div style="flex:1;background:#e2e8f0;border-radius:3px;height:9px">
         <div style="background:#1d4ed8;width:${pct}%;height:100%;border-radius:3px"></div>
       </div>
@@ -344,13 +350,13 @@ export function exportUserReportPDF() {
   // ── جدول الحركات ──
   const rows = asc.map((e,i)=>{
     const b     = balsMap[e.id]||0;
-    const label = e.type==='expense'?(e.etLabel||EL[e.et]||'أخرى'):(TL[e.type]||e.type);
-    const plate = e.type==='meter'&&e.notes?(e.notes.split('|')[0].replace('لوحة:','').trim()||'—'):'—';
+    const label = e.type==='expense'?(_esc(e.etLabel||EL[e.et]||'أخرى')):(_esc(TL[e.type]||e.type));
+    const plate = e.type==='meter'&&e.notes?(_esc(e.notes.split('|')[0].replace('لوحة:','').trim()||'—')):'—';
     const bg    = i%2===0?'':'background:#f0f5ff;';
     return `<tr style="${bg}">
-      <td>${i+1}</td><td>${fD(e.date)}</td><td><b>${e.ref||'—'}</b></td>
+      <td>${i+1}</td><td>${fD(e.date)}</td><td><b>${_esc(e.ref)||'—'}</b></td>
       <td>${plate}</td><td>${label}</td>
-      <td style="text-align:right;max-width:120px">${e.desc||''}</td>
+      <td style="text-align:right;max-width:120px">${_esc(e.desc)||''}</td>
       <td style="color:#1d4ed8;font-weight:700">${e.met?e.met+'م':'—'}</td>
       <td style="color:#15803d;font-weight:700">${e.deb?fEN(e.deb):''}</td>
       <td style="color:#b91c1c;font-weight:700">${e.crd?fEN(e.crd):''}</td>
@@ -634,6 +640,7 @@ export async function exportJSON(currentUser, writeAuditLog) {
 }
 
 export function importJSON(currentUser, writeAuditLog) {
+  if (get().currentRole !== 'admin') { _toast('⚠ الاستيراد متاح لمدير النظام فقط','err'); return; }
   const input = document.createElement('input'); input.type='file'; input.accept='.json';
   input.onchange = async (ev) => {
     const file = ev.target.files[0]; if (!file) return;
@@ -662,6 +669,7 @@ export function importJSON(currentUser, writeAuditLog) {
 // استيراد من Excel
 // ══════════════════════════════
 export function importExcel(currentUser, writeAuditLog) {
+  if (get().currentRole !== 'admin') { _toast('⚠ الاستيراد متاح لمدير النظام فقط','err'); return; }
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = '.xlsx,.xls';
