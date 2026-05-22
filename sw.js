@@ -2,7 +2,7 @@
 // sw.js — Service Worker لدعم PWA والعمل بدون إنترنت
 // ══════════════════════════════════════════════════════════
 
-const CACHE_NAME    = 'masaar-v3';
+const CACHE_NAME    = 'masaar-v4';
 const OFFLINE_URL   = './index.html';
 
 // الملفات المحلية التي تُخزَّن في أول تشغيل
@@ -15,6 +15,8 @@ const STATIC_ASSETS = [
   './reports.js',
   './exports.js',
   './users.js',
+  './shifts.js',
+  './reconcile.js',
   './style.css',
   './manifest.json',
   './icon-192.png',

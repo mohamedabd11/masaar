@@ -274,7 +274,7 @@ function subscribeToEntries() {
     });
     invalidateCache();
     renderAll();
-  }, err => { toast('⚠ خطأ في تحميل البيانات','err'); });
+  }, err => { console.error('[Firestore] entries error:', err.code, err.message); toast('⚠ خطأ في تحميل البيانات','err'); });
 }
 
 async function loadSystemSettings() {
