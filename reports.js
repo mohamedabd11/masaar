@@ -564,8 +564,15 @@ export function renderUserReportTable() {
     return;
   }
 
+  // حساب الرصيد المرحّل من الحركات قبل فترة التصفية
+  let openingBal = 0;
+  if (from) {
+    (mo._allEntries || []).forEach(e => {
+      if (e.date < from) openingBal += (e.deb||0) - (e.crd||0);
+    });
+  }
   const asc = [...filtered].reverse();
-  let bal = 0; const balsMap = {};
+  let bal = openingBal; const balsMap = {};
   asc.forEach(e => { bal += (e.deb||0) - (e.crd||0); balsMap[e.id] = bal; });
   const totD = filtered.reduce((s,e)=>s+(e.deb||0),0);
   const totC = filtered.reduce((s,e)=>s+(e.crd||0),0);
@@ -595,8 +602,9 @@ export function renderUserReportTable() {
   bodyEl.innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
       <div style="background:var(--b100);border:1px solid var(--b200);border-radius:var(--r2);padding:10px;text-align:center">
-        <div style="font-size:.7rem;color:var(--text3)">الرصيد في الفترة</div>
+        <div style="font-size:.7rem;color:var(--text3)">الرصيد الختامي</div>
         <div style="font-size:1.1rem;font-weight:900;color:${bal>=0?'var(--green)':'var(--red)'}">${fEN(bal)} ر.س</div>
+        ${openingBal ? `<div style="font-size:.65rem;color:var(--text3);margin-top:2px">مرحّل: ${fEN(openingBal)}</div>` : ''}
       </div>
       <div style="background:var(--surface);border:1px solid var(--line);border-radius:var(--r2);padding:10px;text-align:center">
         <div style="font-size:.7rem;color:var(--text3)">إجمالي الأمتار</div>
@@ -613,7 +621,14 @@ export function renderUserReportTable() {
     </div>
     <div class="scroll-x"><table style="min-width:640px;font-size:.8rem">
       <thead><tr><th>#</th><th>التاريخ</th><th>السند</th><th>اللوحة</th><th>النوع</th><th>البيان</th><th>أمتار</th><th>وارد</th><th>صادر</th><th>الرصيد</th><th>⚙</th></tr></thead>
-      <tbody>${rows}</tbody>
+      <tbody>
+        ${openingBal ? `<tr style="background:var(--b100);font-weight:800">
+          <td colspan="9" style="color:var(--text2);text-align:right;padding:6px 8px">⬆ رصيد مرحّل من فترة سابقة</td>
+          <td style="color:${openingBal>=0?'var(--green)':'var(--red)'};font-weight:900">${fEN(openingBal)}</td>
+          <td></td>
+        </tr>` : ''}
+        ${rows}
+      </tbody>
     </table></div>`;
 }
 
