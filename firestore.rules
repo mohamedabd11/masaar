@@ -7,9 +7,91 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      // السماح للمستخدمين المسجّلين فقط — الزوار والمجهولون محظورون
-      allow read, write: if request.auth != null;
+
+    function ud() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
+
+    function isAdminActive() {
+      let d = ud();
+      return d.deleted != true && d.active != false && d.role == 'admin';
+    }
+
+    function isManagerActive() {
+      let d = ud();
+      return d.deleted != true && d.active != false && d.role == 'manager';
+    }
+
+    function isActiveUser() {
+      let d = ud();
+      return d.deleted != true && d.active != false;
+    }
+
+    function canWrite() {
+      let d = ud();
+      return d.deleted != true && d.active != false &&
+             (d.role == 'admin' || d.role == 'manager' ||
+              d.role == 'editor' || d.role == 'custom');
+    }
+
+    // ══════════════════════════════════════════
+    // entries: الأدمن والمدير يقرآن كل شيء — الموظف يقرأ سجلاته فقط
+    // ══════════════════════════════════════════
+    match /entries/{entryId} {
+      allow read: if request.auth != null && isAdminActive();
+      allow read: if request.auth != null && isManagerActive();
+      allow read: if request.auth != null && isActiveUser()
+                  && resource.data.createdBy == request.auth.token.email;
+
+      allow create: if request.auth != null && canWrite()
+                    && request.resource.data.createdBy == request.auth.token.email;
+
+      allow update: if request.auth != null && isAdminActive();
+      allow delete: if request.auth != null && isAdminActive();
+    }
+
+    // ══════════════════════════════════════════
+    // users: مفتوح للقراءة لكل المسجّلين — هذا ضروري لكي تعمل دالة ud()
+    // بدون هذا تحدث حلقة دائرية عند التحقق من الصلاحيات
+    // ══════════════════════════════════════════
+    match /users/{userId} {
+      allow read: if request.auth != null;
+
+      allow create: if request.auth != null && (
+        isAdminActive() ||
+        !exists(/databases/$(database)/documents/users/$(userId))
+      );
+      allow update: if request.auth != null && isAdminActive();
+      allow delete: if request.auth != null && isAdminActive();
+    }
+
+    // ══════════════════════════════════════════
+    // settings: المستخدمون النشطون يقرأون — الأدمن يعدّل
+    // ══════════════════════════════════════════
+    match /settings/{docId} {
+      allow read:  if request.auth != null && isActiveUser();
+      allow write: if request.auth != null && isAdminActive();
+    }
+
+    // ══════════════════════════════════════════
+    // shifts: المستخدمون النشطون يقرأون — الأدمن والمدير يضيفون
+    // ══════════════════════════════════════════
+    match /shifts/{shiftId} {
+      allow read:   if request.auth != null && isActiveUser();
+      allow create: if request.auth != null && isAdminActive();
+      allow create: if request.auth != null && isManagerActive();
+      allow update, delete: if request.auth != null && isAdminActive();
+    }
+
+    // ══════════════════════════════════════════
+    // auditLog: الأدمن فقط يقرأ — أي مستخدم نشط يضيف
+    // ══════════════════════════════════════════
+    match /auditLog/{logId} {
+      allow read: if request.auth != null && isAdminActive();
+      allow create: if request.auth != null && isActiveUser()
+                    && request.resource.data.performedBy == request.auth.token.email;
+      allow update, delete: if false;
+    }
+
   }
 }

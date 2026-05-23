@@ -316,7 +316,13 @@ export function exportUserReportPDF() {
   const dateStr = new Date().toLocaleDateString('ar-SA',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
 
   // ── الأرقام ──
-  const asc = [...entries].reverse(); let bal=0; const balsMap={};
+  let openingBal = 0;
+  if (from) {
+    (mo._allEntries || []).forEach(e => {
+      if (e.date < from) openingBal += (e.deb||0) - (e.crd||0);
+    });
+  }
+  const asc = [...entries].reverse(); let bal = openingBal; const balsMap={};
   asc.forEach(e => { bal+=(e.deb||0)-(e.crd||0); balsMap[e.id]=bal; });
   const totD = entries.reduce((s,e)=>s+(e.deb||0),0);
   const totC = entries.reduce((s,e)=>s+(e.crd||0),0);
@@ -405,6 +411,7 @@ export function exportUserReportPDF() {
     <div class="card card-blue">
       <div class="l">الرصيد الختامي</div>
       <div class="v">${fEN(bal)}</div>
+      ${openingBal ? `<div style="font-size:7px;opacity:.7;margin-top:2px">مرحّل: ${fEN(openingBal)}</div>` : ''}
     </div>
     <div class="card card-green">
       <div class="l">إجمالي الوارد</div>
@@ -473,7 +480,10 @@ export function exportUserReportPDF() {
   <span class="divider">📋 تفصيل الحركات (${entries.length} حركة)</span>
   <table>
     <thead><tr><th>#</th><th>التاريخ</th><th>السند</th><th>اللوحة</th><th>النوع</th><th>البيان</th><th>أمتار</th><th>وارد ر.س</th><th>صادر ر.س</th><th>الرصيد ر.س</th></tr></thead>
-    <tbody>${rows}</tbody>
+    <tbody>
+      ${openingBal ? `<tr style="background:#e0f2fe;font-weight:800"><td colspan="9" style="text-align:right;padding:4px 6px;color:#0369a1">⬆ رصيد مرحّل من فترة سابقة</td><td style="color:${openingBal>=0?'#15803d':'#b91c1c'};font-weight:900">${fEN(openingBal)}</td></tr>` : ''}
+      ${rows}
+    </tbody>
     <tfoot><tr class="totrow">
       <td colspan="6">الإجماليات</td>
       <td>${totM}م</td>
@@ -502,7 +512,13 @@ export function exportUserReportExcel() {
   const to   = g('ur-to')?.value||'';
   const dateRangeLabel = from||to ? `${from||'البداية'} — ${to||'اليوم'}` : 'كل البيانات';
 
-  const asc = [...entries].reverse(); let bal=0; const balsMap={};
+  let openingBalX = 0;
+  if (from) {
+    (mo._allEntries || []).forEach(e => {
+      if (e.date < from) openingBalX += (e.deb||0) - (e.crd||0);
+    });
+  }
+  const asc = [...entries].reverse(); let bal = openingBalX; const balsMap={};
   asc.forEach(e => { bal+=(e.deb||0)-(e.crd||0); balsMap[e.id]=bal; });
   const totD = entries.reduce((s,e)=>s+(e.deb||0),0);
   const totC = entries.reduce((s,e)=>s+(e.crd||0),0);
